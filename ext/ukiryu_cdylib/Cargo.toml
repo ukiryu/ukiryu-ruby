@@ -1,0 +1,33 @@
+[package]
+name = "ukiryu_cdylib"
+version = "0.4.0"
+edition = "2021"
+rust-version = "1.86"
+description = "Vendored cdylib for ukiryu platform gems: the core's C ABI for the Ruby ffi tier"
+license = "BSD-2-Clause"
+repository = "https://github.com/ukiryu/ukiryu-ruby"
+publish = false
+
+# Standalone until the gem's extension workspace exists; then this becomes a
+# member and the lock moves to the workspace root.
+[workspace]
+
+[lib]
+name = "ukiryu"
+crate-type = ["cdylib"]
+doc = false
+
+[dependencies]
+# DEVELOPMENT PIN, NOT THE SHIPPED FORM. No ukiryu crate is published yet, so
+# this follows ukiryu/ukiryu-rs at the commit that adds the typed wire
+# operations (ukiryu/ukiryu-rs#66, 4827c94). A gem built from this manifest
+# does not qualify for release: before release this must become the crates.io
+# dependency, for example
+#   ukiryu = { version = "=0.1.0", features = ["c"] }
+# with a comment naming the ukiryu-rs release that carries each fix.
+ukiryu = { git = "https://github.com/ukiryu/ukiryu-rs", rev = "4827c94c940fe9c0bbf0d37b1e4e6baa487210f9", features = ["c"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
