@@ -1,0 +1,20 @@
+---
+# A tool that always exits 1, for the ExecutionError example.
+ukiryu_schema: '1.0'
+name: exit_one
+version: '1.0'
+execution_profiles:
+- name: default
+  platforms:
+  - macos
+  - linux
+  shells:
+  - bash
+  - zsh
+  - sh
+  - fish
+  option_style: single_dash_space
+  executable_name: "false"
+  commands:
+  - name: fail
+    description: Exit with status 1

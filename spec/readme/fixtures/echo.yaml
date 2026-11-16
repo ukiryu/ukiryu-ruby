@@ -1,0 +1,26 @@
+---
+# A tool every Unix runner has, so README examples that need a result
+# (Result, Output, ExecutionMetadata) produce one on both gems.
+ukiryu_schema: '1.0'
+name: echo
+version: '1.0'
+execution_profiles:
+- name: default
+  platforms:
+  - macos
+  - linux
+  shells:
+  - bash
+  - zsh
+  - sh
+  - fish
+  option_style: single_dash_space
+  executable_name: echo
+  commands:
+  - name: say
+    description: Print the text
+    arguments:
+    - name: text
+      type: string
+      position: last
+      required: true
