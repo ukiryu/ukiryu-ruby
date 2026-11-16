@@ -81,8 +81,12 @@ jobs:
         shell: bash
         run: |
           gem=$(ls pkg/*.gem)
-          gem spec "$gem" platform | tee spec.txt
-          grep -q "${{ matrix.platform }}" spec.txt || { echo "::error::wrong platform in spec"; exit 1; }
+          ruby -rrubygems/package -e '
+            spec = Gem::Package.new(ARGV[0]).spec
+            want = Gem::Platform.new(ARGV[1])
+            abort "wrong platform #{spec.platform}, wanted #{want}" unless spec.platform == want
+            puts "#{spec.full_name} platform #{spec.platform}"
+          ' "$gem" "${{ matrix.platform }}"
           tar -xOf "$gem" data.tar.gz | tar -tz | tee files.txt
           grep -q "lib/ukiryu/ffi/${{ matrix.library }}" files.txt || { echo "::error::library not vendored"; exit 1; }
       - name: Install into a clean GEM_HOME and load the ffi tier
