@@ -28,7 +28,7 @@ module Ukiryu
       def encode(value)
         case value
         when nil, true, false, Integer then value
-        when Float then { "$float" => value.to_s }
+        when Float then { "$float" => float_text(value) }
         when Symbol then { "$sym" => text(value.to_s, "Symbol") }
         when String then encode_string(value)
         when Time then encode_time(value)
@@ -169,9 +169,56 @@ module Ukiryu
                     raise EncodingError, "invalid $float #{text.inspect}"
                   end
                 end
-        return value if value.to_s == text
+        return value if float_text(value) == text
 
-        raise EncodingError, "$float #{text.inspect} is not Float#to_s form (#{value})"
+        raise EncodingError, "$float #{text.inspect} is not Float#to_s form (#{float_text(value)})"
+      end
+
+      # MRI's Float#to_s text, computed here rather than taken from the
+      # running Ruby: the wire requires MRI's form, and other runtimes print
+      # some values differently (TruffleRuby prints 5.0e-324 as 4.9e-324).
+      # The digits are the shortest that read back to the same Float (the
+      # correctly rounded %e form at the first precision that round-trips);
+      # the layout follows MRI's flo_to_s.
+      def float_text(value)
+        return "NaN" if value.nan?
+        return value.positive? ? "Infinity" : "-Infinity" if value.infinite?
+        return (1.0 / value).negative? ? "-0.0" : "0.0" if value.zero?
+
+        sign = value.negative? ? "-" : ""
+        magnitude = value.abs
+        digits, exponent = shortest_digits(magnitude)
+        decpt = exponent + 1
+        if decpt.positive?
+          if decpt < digits.length
+            "#{sign}#{digits[0, decpt]}.#{digits[decpt..]}"
+          elsif decpt < 16
+            "#{sign}#{digits}#{'0' * (decpt - digits.length)}.0"
+          else
+            exponent_text(sign, digits, decpt)
+          end
+        elsif decpt > -4
+          "#{sign}0.#{'0' * -decpt}#{digits}"
+        else
+          exponent_text(sign, digits, decpt)
+        end
+      end
+
+      def shortest_digits(magnitude)
+        (1..17).each do |precision|
+          text = format("%.#{precision - 1}e", magnitude)
+          next unless Float(text) == magnitude
+
+          mantissa, exponent = text.split("e")
+          digits = mantissa.delete(".").sub(/0+\z/, "")
+          return [digits.empty? ? "0" : digits, Integer(exponent, 10)]
+        end
+        raise EncodingError, "no round-trip digits for #{magnitude}"
+      end
+
+      def exponent_text(sign, digits, decpt)
+        fraction = digits.length > 1 ? digits[1..] : "0"
+        format("%s%s.%se%+03d", sign, digits[0], fraction, decpt - 1)
       end
 
       def decode_time(inner)

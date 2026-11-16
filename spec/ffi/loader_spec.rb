@@ -22,13 +22,16 @@ RSpec.describe Ukiryu::Ffi::Library do
 
   it "uses only the explicit UKIRYU_FFI_LIB path" do
     source = Ukiryu::Ffi.library.path
-    Dir.mktmpdir do |dir|
-      copy = File.join(dir, "copy-#{File.basename(source)}")
-      FileUtils.cp(source, copy)
-      library = described_class.locate(Ukiryu::Ffi::ENV_LIBRARY => copy)
-      expect(library.path).to eq(copy)
-      expect(library.abi_version).to eq(Ukiryu::Ffi::ABI_VERSION)
-    end
+    # Windows keeps a loaded DLL locked until the process exits, so the
+    # directory holding the copy is left for the runner to discard there.
+    dir = Dir.mktmpdir
+    copy = File.join(dir, "copy-#{File.basename(source)}")
+    FileUtils.cp(source, copy)
+    library = described_class.locate(Ukiryu::Ffi::ENV_LIBRARY => copy)
+    expect(library.path).to eq(copy)
+    expect(library.abi_version).to eq(Ukiryu::Ffi::ABI_VERSION)
+  ensure
+    FileUtils.remove_entry(dir) if dir && unix?
   end
 
   it "does not fall back when the explicit path is missing" do

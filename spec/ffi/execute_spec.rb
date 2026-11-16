@@ -36,7 +36,7 @@ RSpec.describe "Ukiryu::Ffi tool execution", if: FfiSpecHelper.unix? do
   it "runs jq on stdin and returns an exact result" do
     jq = available(definition("jq", "  - name: process\n    arguments:\n    - name: filter\n" \
                                     "      type: string\n      position: first\n"))
-    result = execute(jq, "process", "filter" => ".foo", "stdin" => '{"foo": "bar"}')
+    result = execute(jq, "process", { "filter" => ".foo", "stdin" => '{"foo": "bar"}' })
     expect(result).to include("stdout" => "\"bar\"\n", "stderr" => "", "status" => 0, "success" => true,
                               "timeout" => 60, "timed_out" => false)
     expect(result["command"]).to include("arguments" => [".foo"], "tool_name" => "jq", "command_name" => "process")
@@ -48,7 +48,7 @@ RSpec.describe "Ukiryu::Ffi tool execution", if: FfiSpecHelper.unix? do
   it "carries stream bytes that are not UTF-8 unchanged" do
     printf = available(definition("printf", "  - name: emit\n    arguments:\n    - name: format\n" \
                                             "      type: string\n      position: first\n"))
-    out = execute(printf, "emit", "format" => "\\377A\\000")["stdout"]
+    out = execute(printf, "emit", { "format" => "\\377A\\000" })["stdout"]
     expect(out).to eq("\xffA\x00".b)
     expect(out.encoding).to eq(Encoding::BINARY)
 

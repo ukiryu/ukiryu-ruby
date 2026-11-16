@@ -73,13 +73,43 @@ RSpec.describe Ukiryu::Ffi::Value do
 
   it "refuses values it cannot carry exactly" do
     expect { described_class.encode(Object.new) }.to raise_error(Ukiryu::Ffi::EncodingError)
-    expect { described_class.encode(Time.at(0, Rational(1, 3))) }.to raise_error(Ukiryu::Ffi::EncodingError)
     expect { described_class.decode(1.5) }.to raise_error(Ukiryu::Ffi::EncodingError)
     expect { described_class.decode("$float" => "1.50") }.to raise_error(Ukiryu::Ffi::EncodingError)
     expect { described_class.decode("$nope" => 1) }.to raise_error(Ukiryu::Ffi::EncodingError)
     expect { described_class.decode("$sym" => "a", "b" => 1) }.to raise_error(Ukiryu::Ffi::EncodingError)
     expect { described_class.decode("$time" => "2023-02-30T00:00:00.000000000Z") }
       .to raise_error(Ukiryu::Ffi::EncodingError)
+  end
+
+  # MRI's Time keeps any Rational fraction, so a time finer than a
+  # nanosecond exists there and must be refused. TruffleRuby's Time holds
+  # whole nanoseconds, so Time.at(0, 1/3r) is already truncated and there is
+  # nothing to refuse.
+  it "refuses a time finer than a nanosecond", if: RUBY_ENGINE == "ruby" do
+    expect { described_class.encode(Time.at(0, Rational(1, 3))) }.to raise_error(Ukiryu::Ffi::EncodingError)
+  end
+
+  # The wire takes MRI's Float#to_s text on every runtime; the encoder
+  # computes it instead of trusting the running Ruby's Float#to_s.
+  {
+    5e-324 => "5.0e-324", -5e-324 => "-5.0e-324", 1e-323 => "1.0e-323",
+    2.2250738585072014e-308 => "2.2250738585072014e-308", 1.7976931348623157e+308 => "1.7976931348623157e+308",
+    0.0 => "0.0", -0.0 => "-0.0", 0.1 => "0.1", 1 / 3.0 => "0.3333333333333333",
+    0.0001 => "0.0001", 1e-05 => "1.0e-05", 2.5e-05 => "2.5e-05",
+    1e14 => "100000000000000.0", 1e15 => "1.0e+15", 1e16 => "1.0e+16",
+    123_456_789_012_345.6 => "123456789012345.6", 1_234_567_890_123_456.8 => "1234567890123456.8",
+    9_007_199_254_740_993.0 => "9.007199254740992e+15", 1e22 => "1.0e+22", 1e23 => "1.0e+23",
+    Float::INFINITY => "Infinity", -Float::INFINITY => "-Infinity"
+  }.each do |float, text|
+    it "writes #{text} in MRI's Float#to_s form and reads it back" do
+      expect(described_class.encode(float)).to eq("$float" => text)
+      expect(described_class.decode("$float" => text).to_s).to eq(float.to_s)
+      expect(described_class.decode("$float" => text)).to eql(float)
+    end
+  end
+
+  it "writes NaN" do
+    expect(described_class.encode(Float::NAN)).to eq("$float" => "NaN")
   end
 
   it "reads keys that only start with $ after the first as plain keys" do
