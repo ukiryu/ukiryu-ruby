@@ -1,0 +1,137 @@
+name: ffi
+
+# The ffi tier: build the cdylib twin of the core's C ABI on each host, then
+# load it through the ffi gem on MRI and TruffleRuby and run the ffi specs
+# (loader, ABI ownership, values, conformance corpus, tool execution).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ffi-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  MANIFEST: ext/ukiryu_cdylib/Cargo.toml
+
+jobs:
+  cdylib:
+    name: cdylib (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            file: libukiryu.so
+          - os: macos-15
+            file: libukiryu.dylib
+          - os: windows-2022
+            file: ukiryu.dll
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.86
+        with:
+          components: rustfmt
+      - name: Development pin notice
+        shell: bash
+        run: |
+          echo "::warning::ukiryu core is a development git dependency (ukiryu-rs $(sed -n 's/.*ukiryu-rs?rev=[0-9a-f]*#\([0-9a-f]*\).*/\1/p' ext/ukiryu_cdylib/Cargo.lock | head -1)); this build is not production-qualified until the cdylib consumes the published crate."
+      - name: Format
+        run: cargo fmt --manifest-path ${{ env.MANIFEST }} --check
+      - name: Lock is current
+        run: cargo metadata --locked --format-version 1 --manifest-path ${{ env.MANIFEST }} > /dev/null
+        shell: bash
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ext/ukiryu_cdylib/target
+          key: cdylib-${{ matrix.os }}-${{ hashFiles('ext/ukiryu_cdylib/Cargo.lock') }}
+      - name: Unit test
+        run: cargo test --locked --manifest-path ${{ env.MANIFEST }}
+      - name: Build
+        run: cargo build --release --locked --manifest-path ${{ env.MANIFEST }}
+      - name: Exported C symbols
+        shell: bash
+        run: |
+          lib=ext/ukiryu_cdylib/target/release/${{ matrix.file }}
+          case "$RUNNER_OS" in
+            Linux) syms=$(nm -D --defined-only "$lib") ;;
+            macOS) syms=$(nm -gU "$lib") ;;
+            Windows) syms=$(dumpbin.exe //EXPORTS "$lib" 2>/dev/null || objdump -p "$lib") ;;
+          esac
+          for sym in ukiryu_abi_version ukiryu_json ukiryu_free; do
+            grep -Eq "(^|[ _])${sym}\$" <<<"$syms" || { echo "::error::missing export $sym"; echo "$syms" | head -50; exit 1; }
+            echo "exported: $sym"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cdylib-${{ matrix.os }}
+          path: ext/ukiryu_cdylib/target/release/${{ matrix.file }}
+          if-no-files-found: error
+          retention-days: 7
+
+  ruby:
+    name: ruby ${{ matrix.ruby }} (${{ matrix.os }})
+    needs: cdylib
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, ruby: "3.2" }
+          - { os: ubuntu-24.04, ruby: "3.4" }
+          - { os: ubuntu-24.04, ruby: "4.0" }
+          - { os: ubuntu-24.04, ruby: truffleruby }
+          - { os: macos-15, ruby: "3.2" }
+          - { os: macos-15, ruby: "4.0" }
+          - { os: macos-15, ruby: truffleruby }
+          - { os: windows-2022, ruby: "3.2" }
+          - { os: windows-2022, ruby: "4.0" }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Core revision
+        id: core
+        shell: bash
+        run: |
+          rev=$(sed -n 's/.*ukiryu-rs?rev=[0-9a-f]*#\([0-9a-f]\{40\}\).*/\1/p' ext/ukiryu_cdylib/Cargo.lock | head -1)
+          test -n "$rev"
+          echo "rev=$rev" >> "$GITHUB_OUTPUT"
+      - name: Corpus at the pinned core
+        uses: actions/checkout@v4
+        with:
+          repository: ukiryu/ukiryu-rs
+          ref: ${{ steps.core.outputs.rev }}
+          path: tmp/ukiryu-rs
+          sparse-checkout: |
+            corpus/conformance
+            tests/escape-wire
+      - uses: actions/download-artifact@v4
+        with:
+          name: cdylib-${{ matrix.os }}
+          path: lib/ukiryu/ffi
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+      - name: Gems
+        shell: bash
+        run: |
+          # TruffleRuby ships its own ffi implementation.
+          if [[ "${{ matrix.ruby }}" == truffleruby* ]]; then gem install --no-document rspec; else gem install --no-document ffi rspec; fi
+          ruby -v
+          ruby -rffi -e 'puts "ffi #{FFI::VERSION} #{RUBY_ENGINE}"'
+          ls -l lib/ukiryu/ffi
+      - name: ffi specs
+        shell: bash
+        env:
+          UKIRYU_CONFORMANCE_DIR: ${{ github.workspace }}/tmp/ukiryu-rs/corpus/conformance
+        run: rspec -I lib --format documentation spec/ffi

@@ -1,0 +1,4 @@
+# Platform gems vendor the built cdylib here; it is never committed.
+/*.so
+/*.dylib
+/*.dll
