@@ -1,0 +1,87 @@
+# tools/myprocessor/1.0.yaml
+---
+ukiryu_schema: '1.0'
+
+# Tool metadata
+name: myprocessor
+display_name: MyProcessor
+homepage: https://example.com/myprocessor
+version: '1.0'
+description: Batch file processor for data transformation
+
+# Version detection
+version_detection:
+  command: --version
+  pattern: 'MyProcessor version ([\d.]+)'
+  modern_threshold: '1.0'
+
+# Where to find the executable on each platform
+search_paths:
+  macos:
+    - /usr/local/bin/myprocessor
+    - /opt/homebrew/bin/myprocessor
+  linux:
+    - /usr/bin/myprocessor
+    - /usr/local/bin/myprocessor
+  windows:
+    - C:/Program Files/MyProcessor/bin/myprocessor.exe
+
+# Profiles: platform/shell combinations
+profiles:
+  - name: unix
+    platforms: [macos, linux]
+    shells: [bash, zsh, fish, sh]
+    option_style: double_dash_space
+
+    commands:
+      - name: process
+        description: Process input files
+        arguments:
+          - name: inputs
+            type: file
+            variadic: true
+            min: 1
+            description: Input files to process
+          - name: output
+            type: file
+            position: last
+            description: Output file or directory
+        options:
+          - name: format
+            type: string
+            cli: --format
+            values: [json, xml, csv, yaml]
+            description: Output format
+            default: json
+          - name: verbose
+            type: boolean
+            cli: --verbose
+            short: -v
+            description: Enable verbose output
+            default: false
+          - name: workers
+            type: integer
+            cli: --workers
+            range: 1..16
+            description: Number of parallel workers
+            default: 4
+
+      - name: validate
+        description: Validate input files
+        arguments:
+          - name: inputs
+            type: file
+            variadic: true
+            min: 1
+        options:
+          - name: strict
+            type: boolean
+            cli: --strict
+            description: Enable strict validation
+            default: false
+
+  - name: windows
+    platforms: [windows]
+    shells: [powershell, cmd]
+    option_style: double_dash_space
+    inherits: unix

@@ -2,7 +2,8 @@ name: ffi
 
 # The ffi tier: build the cdylib twin of the core's C ABI on each host, then
 # load it through the ffi gem on MRI and TruffleRuby and run the ffi specs
-# (loader, ABI ownership, values, conformance corpus, tool execution).
+# (loader, ABI ownership, values, conformance corpus, tool execution), and
+# check the public Ruby API against the original gem's README examples.
 
 on:
   push:
@@ -135,3 +136,73 @@ jobs:
         env:
           UKIRYU_CONFORMANCE_DIR: ${{ github.workspace }}/tmp/ukiryu-rs/corpus/conformance
         run: rspec -I lib --format documentation spec/ffi
+
+  # The README examples (spec/readme) run first on the original gem at the
+  # commit the README is taken from; its transcripts are what the native gem
+  # must print.
+  oracle-readme:
+    name: README transcripts (original gem)
+    runs-on: ubuntu-24.04
+    env:
+      ORACLE_REF: ab6df353c6dc2d7faf7817a86aafcafa82579896
+    steps:
+      - uses: actions/checkout@v4
+      - name: Original gem
+        uses: actions/checkout@v4
+        with:
+          repository: ukiryu/ukiryu
+          ref: ${{ env.ORACLE_REF }}
+          path: tmp/oracle
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+          working-directory: tmp/oracle
+      - name: Capture
+        shell: bash
+        env:
+          BUNDLE_GEMFILE: ${{ github.workspace }}/tmp/oracle/Gemfile
+          UKIRYU_REGISTER: ${{ github.workspace }}/tmp/oracle/spec/fixtures/register
+          UKIRYU_SCHEMA_PATH: ${{ github.workspace }}/tmp/oracle/spec/fixtures/tool.schema.yaml
+        run: bundle exec ruby spec/readme/capture.rb --lib tmp/oracle/lib --out tmp/readme-oracle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: readme-oracle
+          path: tmp/readme-oracle
+          if-no-files-found: error
+          retention-days: 7
+
+  readme:
+    name: README examples (native gem)
+    needs: [cdylib, oracle-readme]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Original fixtures
+        uses: actions/checkout@v4
+        with:
+          repository: ukiryu/ukiryu
+          ref: ab6df353c6dc2d7faf7817a86aafcafa82579896
+          path: tmp/oracle
+          sparse-checkout: spec/fixtures
+      - uses: actions/download-artifact@v4
+        with:
+          name: cdylib-ubuntu-24.04
+          path: lib/ukiryu/ffi
+      - uses: actions/download-artifact@v4
+        with:
+          name: readme-oracle
+          path: tmp/readme-oracle
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+      - name: Gems
+        run: gem install --no-document ffi rspec
+      - name: Gem builds
+        run: gem build ukiryu.gemspec
+      - name: README specs
+        env:
+          UKIRYU_REGISTER: ${{ github.workspace }}/tmp/oracle/spec/fixtures/register
+          UKIRYU_SCHEMA_PATH: ${{ github.workspace }}/tmp/oracle/spec/fixtures/tool.schema.yaml
+          UKIRYU_README_ORACLE: ${{ github.workspace }}/tmp/readme-oracle
+        run: rspec -I lib --format documentation spec/readme
