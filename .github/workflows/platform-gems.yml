@@ -1,0 +1,111 @@
+name: platform-gems
+
+# Builds the native cdylib on each target, vendors it into a platform gem
+# candidate, runs `gem build` (scripts/build-platform-gem.rb), installs the
+# gem into a clean GEM_HOME and loads the ffi tier from the installed copy.
+# The gems are uploaded as workflow artifacts. Nothing is pushed to any
+# registry: no `gem push`, no credentials. First publication is the owner's.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-gems-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MANIFEST: ext/ukiryu_cdylib/Cargo.toml
+
+jobs:
+  matrix-check:
+    name: platform list is consistent
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/check-platforms.py
+
+  gem:
+    name: gem (${{ matrix.platform }})
+    needs: matrix-check
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: x86_64-linux
+            runner: ubuntu-24.04
+            library: libukiryu.so
+          - platform: aarch64-linux
+            runner: ubuntu-24.04-arm
+            library: libukiryu.so
+          - platform: x86_64-darwin
+            runner: macos-15-intel
+            library: libukiryu.dylib
+          - platform: arm64-darwin
+            runner: macos-15
+            library: libukiryu.dylib
+          - platform: x64-mingw-ucrt
+            runner: windows-2022
+            library: ukiryu.dll
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.86
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ext/ukiryu_cdylib/target
+          key: gem-${{ matrix.platform }}-${{ hashFiles('ext/ukiryu_cdylib/Cargo.lock') }}
+      - name: Build cdylib
+        run: cargo build --release --locked --manifest-path ${{ env.MANIFEST }}
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+      - name: gem build
+        shell: bash
+        run: |
+          ruby scripts/build-platform-gem.rb \
+            --platform "${{ matrix.platform }}" \
+            --library "ext/ukiryu_cdylib/target/release/${{ matrix.library }}" \
+            --out pkg
+          ls -l pkg
+      - name: Gem contents
+        shell: bash
+        run: |
+          gem=$(ls pkg/*.gem)
+          ruby -rrubygems/package -e '
+            spec = Gem::Package.new(ARGV[0]).spec
+            want = Gem::Platform.new(ARGV[1])
+            abort "wrong platform #{spec.platform}, wanted #{want}" unless spec.platform == want
+            puts "#{spec.full_name} platform #{spec.platform}"
+          ' "$gem" "${{ matrix.platform }}"
+          tar -xOf "$gem" data.tar.gz | tar -tz | tee files.txt
+          grep -q "lib/ukiryu/ffi/${{ matrix.library }}" files.txt || { echo "::error::library not vendored"; exit 1; }
+      - name: Install into a clean GEM_HOME and load the ffi tier
+        shell: bash
+        run: |
+          export GEM_HOME="$RUNNER_TEMP/gemhome" GEM_PATH="$RUNNER_TEMP/gemhome"
+          # ffi comes from rubygems.org as a dependency
+          gem install --no-document pkg/*.gem
+          cd "$RUNNER_TEMP"
+          ruby -e '
+            require "ukiryu/ffi"
+            abort "ffi tier unavailable: #{Ukiryu::Ffi.load_error.inspect}" unless Ukiryu::Ffi.available?
+            lib = Ukiryu::Ffi.library
+            abort "loaded outside the installed gem: #{lib.path}" unless lib.path.include?("gemhome")
+            puts "loaded #{lib.path}, C ABI #{lib.abi_version}"
+          '
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gem-${{ matrix.platform }}
+          path: pkg/*.gem
+          if-no-files-found: error
+          retention-days: 7

@@ -1,0 +1,10 @@
+{
+  "note": "Platform gems: one native cdylib per RubyGems platform. Versions are an owner decision; the gem version is read from ext/ukiryu_cdylib/Cargo.toml unless overridden. Nothing here publishes.",
+  "platforms": [
+    {"platform": "x86_64-linux",   "runner": "ubuntu-24.04",    "library": "libukiryu.so"},
+    {"platform": "aarch64-linux",  "runner": "ubuntu-24.04-arm", "library": "libukiryu.so"},
+    {"platform": "x86_64-darwin",  "runner": "macos-15-intel",  "library": "libukiryu.dylib"},
+    {"platform": "arm64-darwin",   "runner": "macos-15",        "library": "libukiryu.dylib"},
+    {"platform": "x64-mingw-ucrt", "runner": "windows-2022",    "library": "ukiryu.dll"}
+  ]
+}
