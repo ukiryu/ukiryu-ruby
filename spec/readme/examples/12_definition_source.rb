@@ -1,6 +1,7 @@
 # readme: README.adoc:1542
 # readme: README.adoc:1554
 # fixtures: echo.yaml=>path/to/tool.yaml
+# needs: core definition load op with validation modes (Definition::Loader validate_profile)
 tool = Ukiryu::Tool.load('path/to/tool.yaml')
 show(:file_source) { tool.definition_source }
 show(:file_path) { tool.definition_path }

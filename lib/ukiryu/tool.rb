@@ -73,15 +73,15 @@ module Ukiryu
       end
     end
 
-    attr_reader :definition_source, :platform, :shell
+    attr_reader :definition_source
 
     # +source+ is the core's tool source; options name the platform, shell
     # and version (detected from the host when absent).
     def initialize(source, options = {})
       @definition_source = options[:definition_source]
-      @platform = (options[:platform] || Host.platform).to_sym
-      @shell = (options[:shell] || Host.shell).to_sym
-      @request = { "source" => source, "platform" => @platform.to_s, "shell" => @shell.to_s }
+      platform = (options[:platform] || Host.platform).to_sym
+      shell = (options[:shell] || Host.shell).to_sym
+      @request = { "source" => source, "platform" => platform.to_s, "shell" => shell.to_s }
       @request["version"] = options[:version].to_s if options[:version]
       @identity = Bridge.request({ "op" => "resolve", "method" => "tool" }.merge(tool_request))
     end

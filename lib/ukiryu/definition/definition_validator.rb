@@ -10,6 +10,8 @@ module Ukiryu
       class << self
         def validate_file(file_path, schema_path: nil)
           validate_string(File.read(file_path), schema_path: schema_path)
+        rescue Errno::ENOENT
+          ValidationResult.failure(["File not found: #{file_path}"])
         end
 
         def validate_string(yaml_string, schema_path: nil)

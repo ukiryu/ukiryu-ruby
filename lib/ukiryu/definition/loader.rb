@@ -10,8 +10,9 @@ module Ukiryu
     # :none) need a core load op and are not applied yet.
     class Loader
       class << self
+        # Like the original, returns the (emptied) cache: an empty Hash.
         def clear_cache(_source = nil)
-          nil
+          {}
         end
       end
     end

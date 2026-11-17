@@ -1,4 +1,5 @@
 # readme: README.adoc:1588
+# needs: core definition load op classifying YAML parse failures as DefinitionLoadError
 # No tool.yaml in the work directory: the not-found branch.
 def load_tool
   Ukiryu::Tool.load('tool.yaml')

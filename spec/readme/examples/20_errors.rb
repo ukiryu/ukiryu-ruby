@@ -1,5 +1,6 @@
 # readme: README.adoc:2564
 # fixtures: exit_one.yaml=>exit_one.yaml
+# needs: core definition load op with validation modes (Definition::Loader validate_profile)
 def run_with_rescue(tool, params)
   tool.execute(:export, params)
 rescue Ukiryu::Errors::ToolNotFoundError => e
