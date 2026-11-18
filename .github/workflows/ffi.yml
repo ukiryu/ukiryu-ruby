@@ -44,7 +44,7 @@ jobs:
       - name: Development pin notice
         shell: bash
         run: |
-          echo "::warning::ukiryu core is a development git dependency (ukiryu-rs $(sed -n 's/.*ukiryu-rs?rev=[0-9a-f]*#\([0-9a-f]*\).*/\1/p' ext/ukiryu_cdylib/Cargo.lock | head -1)); this build is not production-qualified until the cdylib consumes the published crate."
+          echo "::warning::ukiryu core is a development git dependency (ukiryu-rs $(sed -n 's/.*ukiryu-rs?rev=[0-9a-f]*#\([0-9a-f]*\).*/\1/p' Cargo.lock | head -1)); this build is not production-qualified until the cdylib consumes the published crate."
       - name: Format
         run: cargo fmt --manifest-path ${{ env.MANIFEST }} --check
       - name: Lock is current
@@ -55,8 +55,8 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            ext/ukiryu_cdylib/target
-          key: cdylib-${{ matrix.os }}-${{ hashFiles('ext/ukiryu_cdylib/Cargo.lock') }}
+            target
+          key: cdylib-${{ matrix.os }}-${{ hashFiles('Cargo.lock') }}
       - name: Unit test
         run: cargo test --locked --manifest-path ${{ env.MANIFEST }}
       - name: Build
@@ -64,7 +64,7 @@ jobs:
       - name: Exported C symbols
         shell: bash
         run: |
-          lib=ext/ukiryu_cdylib/target/release/${{ matrix.file }}
+          lib=target/release/${{ matrix.file }}
           case "$RUNNER_OS" in
             Linux) syms=$(nm -D --defined-only "$lib") ;;
             macOS) syms=$(nm -gU "$lib") ;;
@@ -77,7 +77,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: cdylib-${{ matrix.os }}
-          path: ext/ukiryu_cdylib/target/release/${{ matrix.file }}
+          path: target/release/${{ matrix.file }}
           if-no-files-found: error
           retention-days: 7
 
@@ -104,7 +104,7 @@ jobs:
         id: core
         shell: bash
         run: |
-          rev=$(sed -n 's/.*ukiryu-rs?rev=[0-9a-f]*#\([0-9a-f]\{40\}\).*/\1/p' ext/ukiryu_cdylib/Cargo.lock | head -1)
+          rev=$(sed -n 's/.*ukiryu-rs?rev=[0-9a-f]*#\([0-9a-f]\{40\}\).*/\1/p' Cargo.lock | head -1)
           test -n "$rev"
           echo "rev=$rev" >> "$GITHUB_OUTPUT"
       - name: Corpus at the pinned core

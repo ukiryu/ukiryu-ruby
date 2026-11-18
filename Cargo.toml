@@ -1,0 +1,12 @@
+# The gem's extension workspace (the parsanol-ruby layout): the native
+# extension and the ffi tier's cdylib share one lock, so both build against
+# the same core commit. rake-compiler (RbSys::ExtensionTask) reads this
+# workspace from the repository root.
+[workspace]
+resolver = "2"
+members = ["ext/ukiryu_native", "ext/ukiryu_cdylib"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

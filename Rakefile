@@ -32,8 +32,8 @@ RbSys::ExtensionTask.new("ukiryu_native", GEMSPEC) do |ext|
     platform = spec.platform.to_s
     entry = PLATFORMS.find { |p| p["platform"] == platform } or raise "#{platform} is not in release/platforms.json"
     triple = RbSys::ToolchainInfo::DATA.fetch(platform).fetch("rust-target")
-    sh "cargo", "build", "--release", "--locked", "--manifest-path", "ext/ukiryu_cdylib/Cargo.toml", "--target", triple
-    library = "ext/ukiryu_cdylib/target/#{triple}/release/#{entry['library']}"
+    sh "cargo", "build", "--release", "--locked", "-p", "ukiryu_cdylib", "--target", triple
+    library = "target/#{triple}/release/#{entry['library']}"
     raise "cdylib not found: #{library}" unless File.file?(library)
 
     mkdir_p "lib/ukiryu/ffi"
