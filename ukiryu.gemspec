@@ -19,10 +19,15 @@ Gem::Specification.new do |spec|
   spec.license = "BSD-2-Clause"
   spec.required_ruby_version = ">= 3.2"
 
-  spec.files = Dir.glob("lib/**/*.rb") + Dir.glob("lib/ukiryu/ffi/*.{so,dylib,dll}") + ["README.md"]
+  spec.files = Dir.glob("lib/**/*.rb") + Dir.glob("lib/ukiryu/ffi/*.{so,dylib,dll}") + ["README.md"] +
+               Dir.glob("ext/ukiryu_native/{Cargo.toml,Cargo.lock,build.rs,extconf.rb,src/**/*.rs}")
   spec.require_paths = ["lib"]
+  # The native tier (ext/ukiryu_native): compiled at install on MRI, skipped
+  # elsewhere; without it the ffi tier serves every call.
+  spec.extensions = ["ext/ukiryu_native/extconf.rb"]
 
   spec.add_dependency "ffi", "~> 1.16"
+  spec.add_dependency "rb_sys", "~> 0.9"
 
   spec.metadata["rubygems_mfa_required"] = "true"
 end

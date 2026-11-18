@@ -3,6 +3,7 @@
 require_relative "ukiryu/version"
 require_relative "ukiryu/errors"
 require_relative "ukiryu/ffi"
+require_relative "ukiryu/transport"
 require_relative "ukiryu/bridge"
 require_relative "ukiryu/host"
 require_relative "ukiryu/config"
@@ -17,7 +18,8 @@ require_relative "ukiryu/tool"
 # (Ukiryu::Tool, Ukiryu::Register, Ukiryu::Config, result objects and
 # Ukiryu::Errors). Every decision (definition parsing, profile selection,
 # argument building, validation, version detection and execution) is made
-# by the core through Ukiryu::Ffi; the classes here only marshal requests
+# by the core through Ukiryu::Transport (the native extension, or the
+# cdylib through Ukiryu::Ffi); the classes here only marshal requests
 # and wrap replies.
 module Ukiryu
 end
