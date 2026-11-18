@@ -1,0 +1,27 @@
+[package]
+name = "ukiryu_native"
+version = "0.4.0"
+edition = "2021"
+rust-version = "1.86"
+description = "Native extension for the ukiryu gem: an entry point into the core's Ruby binding"
+license = "BSD-2-Clause"
+repository = "https://github.com/ukiryu/ukiryu-ruby"
+publish = false
+
+# Standalone, like ext/ukiryu_cdylib, until the gem has one extension workspace.
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+doc = false
+
+[dependencies]
+magnus = "0.9"
+# DEVELOPMENT PIN, NOT THE SHIPPED FORM. No ukiryu crate is published yet, so
+# this follows ukiryu/ukiryu-rs at the commit that adds Native.json, the
+# in-process ukiryu_json (ukiryu/ukiryu-rs#90). A gem built from this manifest
+# does not qualify for release: before release this must become the crates.io
+# dependency, for example
+#   ukiryu = { version = "=0.1.0", features = ["ruby"] }
+# with a comment naming the ukiryu-rs release that carries each fix.
+ukiryu = { git = "https://github.com/ukiryu/ukiryu-rs", rev = "56245836f0fc4659b63762d89d5420d9a6e86f9a", features = ["ruby"] }

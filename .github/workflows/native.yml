@@ -1,0 +1,109 @@
+name: native
+
+# The native tier: build the gem from this checkout, install it into a clean
+# GEM_HOME so rubygems compiles ext/ukiryu_native (rb_sys + magnus) the way a
+# user's install does, then run spec/native against the installed copy. The
+# specs compare every reply of Ukiryu::Native.json with the C ABI's
+# ukiryu_json, so the C ABI library is built from the same core revision as
+# the extension. Nothing is published.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  MANIFEST: ext/ukiryu_native/Cargo.toml
+
+jobs:
+  native:
+    name: native ruby ${{ matrix.ruby }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, ruby: "3.2", ffi_lib: libukiryu_ffi.so }
+          - { os: ubuntu-24.04, ruby: "4.0", ffi_lib: libukiryu_ffi.so }
+          - { os: macos-15, ruby: "3.4", ffi_lib: libukiryu_ffi.dylib }
+          - { os: windows-2022, ruby: "3.4", ffi_lib: ukiryu_ffi.dll }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.86
+        with:
+          components: rustfmt
+          targets: ${{ runner.os == 'Windows' && 'x86_64-pc-windows-gnu' || '' }}
+      - name: Development pin notice
+        shell: bash
+        run: |
+          echo "::warning::ukiryu core is a development git dependency (ukiryu-rs $(sed -n 's/.*ukiryu-rs?rev=[0-9a-f]*#\([0-9a-f]*\).*/\1/p' ext/ukiryu_native/Cargo.lock | head -1)); this build is not production-qualified until the extension consumes the published crate."
+      - name: Format
+        run: cargo fmt --manifest-path ${{ env.MANIFEST }} --check
+      - name: Lock is current
+        shell: bash
+        run: cargo metadata --locked --format-version 1 --manifest-path ${{ env.MANIFEST }} > /dev/null
+      - name: Core revision
+        id: core
+        shell: bash
+        run: |
+          rev=$(sed -n 's/.*ukiryu-rs?rev=[0-9a-f]*#\([0-9a-f]\{40\}\).*/\1/p' ext/ukiryu_native/Cargo.lock | head -1)
+          test -n "$rev"
+          echo "rev=$rev" >> "$GITHUB_OUTPUT"
+      - name: Core at the extension's revision
+        uses: actions/checkout@v4
+        with:
+          repository: ukiryu/ukiryu-rs
+          ref: ${{ steps.core.outputs.rev }}
+          path: tmp/ukiryu-rs
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            tmp/ukiryu-rs/target
+          key: native-${{ matrix.os }}-${{ steps.core.outputs.rev }}
+      - name: C ABI library at the same revision
+        shell: bash
+        run: |
+          cargo build --release --locked -p ukiryu-ffi --manifest-path tmp/ukiryu-rs/Cargo.toml
+          ls -l tmp/ukiryu-rs/target/release/${{ matrix.ffi_lib }}
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+      - name: Build the gem
+        shell: bash
+        run: |
+          gem build ukiryu.gemspec
+          tar -xOf ukiryu-*.gem data.tar.gz | tar -tz | tee files.txt
+          for f in ext/ukiryu_native/extconf.rb ext/ukiryu_native/Cargo.toml ext/ukiryu_native/Cargo.lock ext/ukiryu_native/src/lib.rs lib/ukiryu/transport.rb; do
+            grep -qx "$f" files.txt || { echo "::error::$f missing from the gem"; exit 1; }
+          done
+      - name: Install into a clean GEM_HOME (compiles the extension)
+        shell: bash
+        run: |
+          export GEM_HOME="$RUNNER_TEMP/gemhome" GEM_PATH="$RUNNER_TEMP/gemhome"
+          gem install --no-document rspec
+          gem install --no-document --verbose ukiryu-*.gem
+      - name: Native specs against the installed gem
+        shell: bash
+        env:
+          UKIRYU_FFI_LIB: ${{ github.workspace }}/tmp/ukiryu-rs/target/release/${{ matrix.ffi_lib }}
+        run: |
+          export GEM_HOME="$RUNNER_TEMP/gemhome" GEM_PATH="$RUNNER_TEMP/gemhome"
+          # Run outside the checkout, and outside the directory that holds
+          # GEM_HOME, so lib/ here cannot shadow the installed gem and the
+          # spec's "not from the checkout" check is meaningful.
+          mkdir -p "$RUNNER_TEMP/run/specs"
+          cp -R spec/native "$RUNNER_TEMP/run/specs/"
+          cd "$RUNNER_TEMP/run/specs"
+          ruby -rrspec/core -e 'exit RSpec::Core::Runner.run(ARGV)' -- --format documentation native

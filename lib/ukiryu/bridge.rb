@@ -11,14 +11,14 @@ module Ukiryu
 
     # The decoded value of a successful reply.
     def request(request)
-      Ffi.request(request)
+      Transport.request(request)
     rescue Ffi::WireError => e
       raise exception_for(e)
     end
 
     # A whole reply object, for ops whose payload is not under "value".
     def reply(request)
-      reply = Ffi.call(request)
+      reply = Transport.call(request)
       return reply if reply["ok"] == true
 
       raise exception_for(Ffi::WireError.from_reply(reply))
