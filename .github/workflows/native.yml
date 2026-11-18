@@ -42,7 +42,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.86
         with:
           components: rustfmt
-          targets: ${{ runner.os == 'Windows' && 'x86_64-pc-windows-gnu' || '' }}
       - name: Development pin notice
         shell: bash
         run: |
@@ -92,6 +91,14 @@ jobs:
         shell: bash
         run: |
           export GEM_HOME="$RUNNER_TEMP/gemhome" GEM_PATH="$RUNNER_TEMP/gemhome"
+          # RubyInstaller is a MinGW build, and rb-sys must compile for the
+          # ABI Ruby was built for, so the extension needs the GNU host
+          # toolchain (the MSVC-hosted C ABI library above is unaffected).
+          if [ "$RUNNER_OS" = Windows ]; then
+            rustup toolchain install 1.86-x86_64-pc-windows-gnu --profile minimal
+            rustup default 1.86-x86_64-pc-windows-gnu
+            cargo --version --verbose | grep host
+          fi
           gem install --no-document rspec
           gem install --no-document --verbose ukiryu-*.gem
       - name: Native specs against the installed gem
