@@ -62,8 +62,8 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            ext/ukiryu_cdylib/target
-          key: gem-${{ matrix.platform }}-${{ hashFiles('ext/ukiryu_cdylib/Cargo.lock') }}
+            target
+          key: gem-${{ matrix.platform }}-${{ hashFiles('Cargo.lock') }}
       - name: Build cdylib
         run: cargo build --release --locked --manifest-path ${{ env.MANIFEST }}
       - uses: ruby/setup-ruby@v1
@@ -74,7 +74,7 @@ jobs:
         run: |
           ruby scripts/build-platform-gem.rb \
             --platform "${{ matrix.platform }}" \
-            --library "ext/ukiryu_cdylib/target/release/${{ matrix.library }}" \
+            --library "target/release/${{ matrix.library }}" \
             --out pkg
           ls -l pkg
       - name: Gem contents

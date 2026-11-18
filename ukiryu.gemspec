@@ -20,7 +20,12 @@ Gem::Specification.new do |spec|
   spec.required_ruby_version = ">= 3.2"
 
   spec.files = Dir.glob("lib/**/*.rb") + Dir.glob("lib/ukiryu/ffi/*.{so,dylib,dll}") + ["README.md"] +
-               Dir.glob("ext/ukiryu_native/{Cargo.toml,Cargo.lock,build.rs,extconf.rb,src/**/*.rs}")
+               # The extension workspace: the install-time build of
+               # ext/ukiryu_native resolves through the root lock, and the
+               # workspace lists ext/ukiryu_cdylib, so both members ship.
+               %w[Cargo.toml Cargo.lock] +
+               Dir.glob("ext/ukiryu_native/{Cargo.toml,build.rs,extconf.rb,src/**/*.rs}") +
+               Dir.glob("ext/ukiryu_cdylib/{Cargo.toml,src/**/*.rs}")
   spec.require_paths = ["lib"]
   # The native tier (ext/ukiryu_native): compiled at install on MRI, skipped
   # elsewhere; without it the ffi tier serves every call.

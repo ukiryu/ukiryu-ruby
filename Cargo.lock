@@ -434,6 +434,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ukiryu_cdylib"
+version = "0.4.0"
+dependencies = [
+ "ukiryu",
+]
+
+[[package]]
 name = "ukiryu_native"
 version = "0.4.0"
 dependencies = [

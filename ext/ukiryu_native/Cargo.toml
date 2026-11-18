@@ -8,9 +8,6 @@ license = "BSD-2-Clause"
 repository = "https://github.com/ukiryu/ukiryu-ruby"
 publish = false
 
-# Standalone, like ext/ukiryu_cdylib, until the gem has one extension workspace.
-[workspace]
-
 [lib]
 crate-type = ["cdylib"]
 doc = false

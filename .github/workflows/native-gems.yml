@@ -1,0 +1,109 @@
+name: native-gems
+
+# Precompiled native gems, the parsanol-ruby gem-build layout: for each
+# platform in release/platforms.json, oxidize-rb/cross-gem runs
+# `rake native:<platform> gem` in rb-sys-dock, which compiles
+# ext/ukiryu_native for every supported Ruby minor version and vendors that
+# platform's cdylib for the ffi tier (see Rakefile). Each gem is then
+# installed into a clean GEM_HOME on a runner of its own platform, and
+# spec/native runs against the installed copy. The gems are workflow
+# artifacts only: no `gem push`, no credentials.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-gems-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUBY_VERSIONS: "3.2,3.3,3.4,4.0"
+
+jobs:
+  platforms:
+    name: platform list
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: echo "matrix=$(jq -c '.platforms' release/platforms.json)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: build (${{ matrix.platform }})
+    needs: platforms
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.platforms.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+      # rb-sys-dock bind-mounts the host's cargo registry and git caches,
+      # which do not exist on a runner that has not run cargo.
+      - name: Cargo cache directories for rb-sys-dock
+        run: mkdir -p ~/.cargo/registry ~/.cargo/git
+      - uses: oxidize-rb/actions/cross-gem@v1.5.0
+        id: cross-gem
+        with:
+          platform: ${{ matrix.platform }}
+          ruby-versions: ${{ env.RUBY_VERSIONS }}
+      - name: Gem contents
+        shell: bash
+        run: |
+          gem="${{ steps.cross-gem.outputs.gem-path }}"
+          tar -xOf "$gem" data.tar.gz | tar -tz | tee files.txt
+          grep -qx "lib/ukiryu/ffi/${{ matrix.library }}" files.txt || { echo "::error::cdylib not vendored"; exit 1; }
+          for v in ${RUBY_VERSIONS//,/ }; do
+            grep -Eq "^lib/ukiryu/$v/ukiryu_native\.(so|bundle|dll)$" files.txt || { echo "::error::no extension for Ruby $v"; exit 1; }
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-gem-${{ matrix.platform }}
+          path: ${{ steps.cross-gem.outputs.gem-path }}
+          if-no-files-found: error
+          retention-days: 7
+
+  smoke:
+    name: smoke (${{ matrix.platform }})
+    needs: [platforms, build]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.platforms.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-gem-${{ matrix.platform }}
+          path: pkg
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+      - name: Install into a clean GEM_HOME
+        shell: bash
+        run: |
+          export GEM_HOME="$RUNNER_TEMP/gemhome" GEM_PATH="$RUNNER_TEMP/gemhome"
+          gem install --no-document rspec
+          gem install --no-document --verbose pkg/*.gem
+          gem list ukiryu
+      - name: Native specs against the installed gem
+        shell: bash
+        run: |
+          export GEM_HOME="$RUNNER_TEMP/gemhome" GEM_PATH="$RUNNER_TEMP/gemhome"
+          mkdir -p "$RUNNER_TEMP/run/specs"
+          cp -R spec/native "$RUNNER_TEMP/run/specs/"
+          cd "$RUNNER_TEMP/run/specs"
+          ruby -rrspec/core -e 'exit RSpec::Core::Runner.run(ARGV)' -- --format documentation native

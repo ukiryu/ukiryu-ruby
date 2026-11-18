@@ -23,12 +23,9 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
   }.freeze
 
   # Rows where the core's YAML parser message differs from Psych at the
-  # pinned core commit (the core's own wire corpus test shows the same three).
-  known_divergences = %w[
-    schema.bundled.profiles-ghostscript-10-0
-    schema.bundled.profiles-inkscape-1-0
-    schema.synthetic.invalid-yaml
-  ].freeze
+  # pinned core commit. None at 5624583: its yeptris (0.6.72) gives Psych's
+  # messages for the three rows that differed at 4827c94.
+  known_divergences = [].freeze
 
   rows = lambda do |kind|
     File.readlines(File.join(corpus, "cases", "#{kind}.jsonl"), chomp: true)
@@ -100,7 +97,7 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
     { "ok" => scrub.(ok) }
   end
 
-  it "matches every dispatched row except the known YAML message divergences" do
+  it "matches every dispatched row" do
     dispatched = Hash.new(0)
     failures = {}
     decoded = 0
