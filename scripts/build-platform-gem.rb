@@ -40,6 +40,8 @@ abort "no version" unless version
 Dir.mktmpdir do |stage|
   FileUtils.mkdir_p(File.join(stage, "lib/ukiryu/ffi"))
   FileUtils.cp(File.join(ROOT, "lib/ukiryu/ffi.rb"), File.join(stage, "lib/ukiryu/ffi.rb"))
+  # ffi.rb requires ractor_local.rb, so the ffi-only gem ships it too.
+  FileUtils.cp(File.join(ROOT, "lib/ukiryu/ractor_local.rb"), File.join(stage, "lib/ukiryu/ractor_local.rb"))
   Dir[File.join(ROOT, "lib/ukiryu/ffi/*.rb")].each { |f| FileUtils.cp(f, File.join(stage, "lib/ukiryu/ffi/")) }
   FileUtils.cp(opts[:library], File.join(stage, "lib/ukiryu/ffi", entry["library"]))
 
