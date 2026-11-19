@@ -1,6 +1,5 @@
 # readme: README.adoc:2461
 # fixtures: echo.yaml=>echo.yaml
-# needs: core definition load op with validation modes (Definition::Loader validate_profile)
 # The README's call (no execution_timeout) as written, on inkscape:
 tool = Ukiryu::Tool.get(:inkscape)
 params = { inputs: ['drawing.svg'], output: 'drawing.png' }

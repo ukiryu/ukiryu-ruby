@@ -33,8 +33,7 @@ module Ukiryu
       # Builds a tool from a definition file. Raises
       # Ukiryu::Errors::DefinitionNotFoundError when the file is missing.
       #
-      # The original's validation: option (:strict, :lenient, :none) needs a
-      # core load op and is accepted but not applied yet.
+      # Validation modes and inheritance are applied by the native loader.
       def load(file_path, options = {})
         from_source(Definition::Sources::FileSource.new(file_path), options)
       end
@@ -64,7 +63,8 @@ module Ukiryu
       private
 
       def from_source(definition_source, options)
-        source = { "kind" => "definition", "yaml" => definition_source.load }
+        profile = Definition::Loader.load_from_source(definition_source, options)
+        source = { "kind" => "definition", "yaml" => profile.to_yaml }
         new(source, options.merge(definition_source: definition_source))
       end
 

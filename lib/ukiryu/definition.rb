@@ -6,12 +6,13 @@ require_relative "definition/sources/string"
 require_relative "definition/loader"
 require_relative "definition/validation_result"
 require_relative "definition/definition_validator"
+require_relative "definition/discovery"
+require_relative "definition/version_resolver"
+require_relative "definition/definition_linter"
+require_relative "definition/documentation_generator"
 
 module Ukiryu
   # Tool definitions: where they come from and how they validate.
-  #
-  # Discovery, VersionResolver, DefinitionLinter and DocumentationGenerator
-  # of the original are not here: the core has no wire op for them yet.
   module Definition
   end
 end
