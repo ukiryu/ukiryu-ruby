@@ -6,7 +6,8 @@ name: native-gems
 # ext/ukiryu_native for every supported Ruby minor version and vendors that
 # platform's cdylib for the ffi tier (see Rakefile). Each gem is then
 # installed into a clean GEM_HOME on a runner of its own platform, and
-# spec/native runs against the installed copy. The gems are workflow
+# spec/native runs against the installed copy. A platform entry may narrow
+# the Ruby minors with ruby_versions (Windows on ARM Ruby starts at 3.4). The gems are workflow
 # artifacts only: no `gem push`, no credentials.
 
 on:
@@ -58,9 +59,11 @@ jobs:
         id: cross-gem
         with:
           platform: ${{ matrix.platform }}
-          ruby-versions: ${{ env.RUBY_VERSIONS }}
+          ruby-versions: ${{ matrix.ruby_versions || env.RUBY_VERSIONS }}
       - name: Gem contents
         shell: bash
+        env:
+          RUBY_VERSIONS: ${{ matrix.ruby_versions || env.RUBY_VERSIONS }}
         run: |
           gem="${{ steps.cross-gem.outputs.gem-path }}"
           tar -xOf "$gem" data.tar.gz | tar -tz | tee files.txt
