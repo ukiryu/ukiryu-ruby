@@ -12,6 +12,7 @@ require_relative "ukiryu/configuration"
 require_relative "ukiryu/config"
 require_relative "ukiryu/register"
 require_relative "ukiryu/execution"
+require_relative "ukiryu/executor"
 require_relative "ukiryu/definition"
 require_relative "ukiryu/tool"
 
