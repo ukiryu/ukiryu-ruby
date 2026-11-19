@@ -76,7 +76,6 @@ RSpec.describe Ukiryu::Ffi::Value do
     expect { described_class.decode(1.5) }.to raise_error(Ukiryu::Ffi::EncodingError)
     expect { described_class.decode("$float" => "1.50") }.to raise_error(Ukiryu::Ffi::EncodingError)
     expect { described_class.decode("$nope" => 1) }.to raise_error(Ukiryu::Ffi::EncodingError)
-    expect { described_class.decode("$sym" => "a", "b" => 1) }.to raise_error(Ukiryu::Ffi::EncodingError)
     expect { described_class.decode("$time" => "2023-02-30T00:00:00.000000000Z") }
       .to raise_error(Ukiryu::Ffi::EncodingError)
   end
@@ -115,5 +114,18 @@ RSpec.describe Ukiryu::Ffi::Value do
 
   it "reads keys that only start with $ after the first as plain keys" do
     expect(described_class.decode("a" => 1, "$b" => 2)).to eq("a" => 1, "$b" => 2)
+  end
+
+  # As in the core: an object is a tag only when it has exactly one key.
+  it "reads an object with more keys as a Hash even when its first key starts with $" do
+    schema = { "$schema" => "https://json-schema.org/draft-07/schema#", "title" => "Tool" }
+    expect(described_class.decode(schema)).to eq(schema)
+    expect(described_class.decode("$sym" => "a", "b" => { "$int" => "1" })).to eq("$sym" => "a", "b" => 1)
+  end
+
+  it "refuses a one-key object whose $ key is not a tag" do
+    expect { described_class.decode("$x" => 1) }.to raise_error(Ukiryu::Ffi::EncodingError, /unknown value tag \$x/)
+    expect { described_class.decode("$ref" => "#/definitions/option") }
+      .to raise_error(Ukiryu::Ffi::EncodingError, /unknown value tag \$ref/)
   end
 end
