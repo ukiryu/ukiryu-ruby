@@ -1,7 +1,6 @@
 # doc: docs/interfaces/ruby-api.adoc:343
 # doc: docs/interfaces/ruby-api.adoc:358
 # doc: docs/interfaces/ruby-api.adoc:375
-# needs: Tool#profile (the original's profile model; the core's tool identity has no definition version)
 tool1 = Ukiryu::Tool.get(:inkscape)
 tool2 = Ukiryu::Tool.get(:inkscape)
 show(:same_instance) { tool1.equal?(tool2) }

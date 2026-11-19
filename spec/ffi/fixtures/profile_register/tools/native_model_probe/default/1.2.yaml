@@ -1,0 +1,17 @@
+name: echo
+version: '1.2'
+profiles:
+- name: default
+  commands:
+  - name: say
+    arguments:
+    - name: text
+      type: string
+      position: first
+    options:
+    - name: count
+      cli: --count
+      type: integer
+    flags:
+    - name: verbose
+      cli: --verbose

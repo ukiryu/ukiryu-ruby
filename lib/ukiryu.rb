@@ -14,7 +14,9 @@ require_relative "ukiryu/register"
 require_relative "ukiryu/execution"
 require_relative "ukiryu/executor"
 require_relative "ukiryu/definition"
+require_relative "ukiryu/models"
 require_relative "ukiryu/tool"
+require_relative "ukiryu/tools"
 
 # Ukiryu: declarative CLI tool profiles, executed by the Rust core.
 #
