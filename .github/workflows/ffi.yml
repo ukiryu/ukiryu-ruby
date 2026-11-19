@@ -207,3 +207,61 @@ jobs:
           UKIRYU_SCHEMA_PATH: ${{ github.workspace }}/tmp/oracle/spec/fixtures/tool.schema.yaml
           UKIRYU_README_ORACLE: ${{ github.workspace }}/tmp/readme-oracle
         run: rspec -I lib --format documentation spec/readme
+
+  # The original gem's real-tool specs (spec/tools, from ukiryu/ukiryu @
+  # ab6df353 spec/ukiryu/tools) against the native gem, with the tools
+  # installed. UKIRYU_REQUIRE_TOOLS turns a skip into a failure for the
+  # tools installed here. Ubuntu's apt ImageMagick is 6.x, which the
+  # register's profile does not detect (the original's own Ubuntu CI skips
+  # those specs too); Homebrew's 7.x runs them on macOS.
+  tools:
+    name: real-tool specs (${{ matrix.os }})
+    needs: cdylib
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            require: ghostscript,inkscape
+          - os: macos-15
+            require: imagemagick,ghostscript
+    steps:
+      - uses: actions/checkout@v4
+      - name: Original register
+        uses: actions/checkout@v4
+        with:
+          repository: ukiryu/ukiryu
+          ref: ab6df353c6dc2d7faf7817a86aafcafa82579896
+          path: tmp/oracle
+          sparse-checkout: spec/fixtures
+      - name: Tools (apt)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends imagemagick ghostscript inkscape
+      - name: Tools (Homebrew)
+        if: runner.os == 'macOS'
+        run: brew install imagemagick ghostscript
+      - name: Tool versions
+        shell: bash
+        run: |
+          magick -version || convert -version
+          gs --version
+          if command -v inkscape >/dev/null; then inkscape --version; fi
+          if command -v pwsh >/dev/null; then pwsh -Version; fi
+      - uses: actions/download-artifact@v4
+        with:
+          name: cdylib-${{ matrix.os }}
+          path: lib/ukiryu/ffi
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+      - name: Gems
+        run: gem install --no-document ffi rspec
+      - name: Real-tool specs
+        env:
+          UKIRYU_REGISTER: ${{ github.workspace }}/tmp/oracle/spec/fixtures/register
+          UKIRYU_SCHEMA_PATH: ${{ github.workspace }}/tmp/oracle/spec/fixtures/tool.schema.yaml
+          UKIRYU_REQUIRE_TOOLS: ${{ matrix.require }}
+        run: rspec -I lib --format documentation spec/tools
