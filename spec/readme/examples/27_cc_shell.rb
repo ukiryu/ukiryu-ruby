@@ -1,7 +1,6 @@
 # doc: docs/getting-started/core-concepts.adoc:335
 # doc: docs/getting-started/core-concepts.adoc:352
 # doc: docs/getting-started/core-concepts.adoc:369
-# needs: Ruby shell API (Ukiryu::Shell) and Ukiryu.configure
 show(:detect) { Ukiryu::Shell.detect }
 show(:valid_macos) { Ukiryu::Shell.valid_for_platform(:macos) }
 show(:valid_windows) { Ukiryu::Shell.valid_for_platform(:windows) }
