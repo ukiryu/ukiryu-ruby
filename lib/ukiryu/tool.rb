@@ -68,8 +68,11 @@ module Ukiryu
         new(source, options.merge(definition_source: definition_source))
       end
 
+      # The current Ractor's cache; each Ractor resolves its own tools.
       def tools_cache
-        @tools_cache ||= {}
+        return @tools_cache ||= {} if RactorLocal.main?
+
+        RactorLocal.fetch(:ukiryu_tools_cache) { {} }
       end
     end
 

@@ -17,13 +17,15 @@ module Ukiryu
     ENV_TIER = "UKIRYU_TIER"
     TIERS = %w[native ffi].freeze
 
-    @mutex = Mutex.new
-    @tier = nil
+    # The main Ractor's state; each other Ractor gets its own (RactorLocal).
+    @state = { mutex: Mutex.new, tier: nil, native_error: nil }
 
     class << self
-      # The tier in use, :native or :ffi, chosen on first call.
+      # The tier in use, :native or :ffi, chosen on first call. Each Ractor
+      # chooses its own.
       def tier
-        @tier || @mutex.synchronize { @tier ||= choose }
+        current = state
+        current[:tier] || current[:mutex].synchronize { current[:tier] ||= choose }
       end
 
       # One request: JSON text in, reply JSON text out.
@@ -51,12 +53,20 @@ module Ukiryu
         load_native
       end
 
-      # Forget the chosen tier so the next call chooses again.
+      # Forget the chosen tier so the next call chooses again (in the
+      # current Ractor only).
       def reset!
-        @mutex.synchronize { @tier = nil }
+        current = state
+        current[:mutex].synchronize { current[:tier] = nil }
       end
 
       private
+
+      def state
+        return @state if RactorLocal.main?
+
+        RactorLocal.fetch(:ukiryu_transport) { { mutex: Mutex.new, tier: nil, native_error: nil } }
+      end
 
       def choose(env = ENV)
         requested = env[ENV_TIER].to_s
@@ -64,7 +74,8 @@ module Ukiryu
         when ""
           load_native ? :native : :ffi
         when "native"
-          load_native || raise(Ffi::Error, "#{ENV_TIER}=native but the native extension did not load: #{@native_error}")
+          load_native ||
+            raise(Ffi::Error, "#{ENV_TIER}=native but the native extension did not load: #{state[:native_error]}")
           :native
         when "ffi"
           :ffi
@@ -84,7 +95,7 @@ module Ukiryu
           require feature
           return true if Ukiryu::Native.respond_to?(:json)
         rescue LoadError => e
-          @native_error = e.message
+          state[:native_error] = e.message
         end
         false
       end

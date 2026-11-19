@@ -11,11 +11,14 @@ module Ukiryu
     # Attributes the original returns as Symbols.
     SYMBOL_ATTRIBUTES = %i[shell format].freeze
 
-    @mutex = Mutex.new
+    # The main Ractor's instance lives here; each other Ractor gets its own
+    # (RactorLocal), so configuration set in one Ractor is not seen in another.
+    @state = { mutex: Mutex.new, instance: nil }
 
     class << self
       def instance
-        @mutex.synchronize { @instance ||= new }
+        current = state
+        current[:mutex].synchronize { current[:instance] ||= new }
       end
 
       def configure
@@ -24,7 +27,8 @@ module Ukiryu
       end
 
       def reset!
-        @mutex.synchronize { @instance = new }
+        current = state
+        current[:mutex].synchronize { current[:instance] = new }
       end
 
       def method_missing(method, *args, &block)
@@ -35,6 +39,14 @@ module Ukiryu
 
       def respond_to_missing?(method, include_private = false)
         instance.respond_to?(method) || super
+      end
+
+      private
+
+      def state
+        return @state if RactorLocal.main?
+
+        RactorLocal.fetch(:ukiryu_config) { { mutex: Mutex.new, instance: nil } }
       end
     end
 
@@ -48,9 +60,18 @@ module Ukiryu
       @cli = {}
     end
 
+    # Defined from source rather than with define_method: a block-defined
+    # method cannot be called outside the Ractor that defined it.
     ATTRIBUTES.each do |name|
-      define_method(name) { to_h[name] }
-      define_method(:"#{name}=") { |value| @programmatic[name.to_s] = wire(value) }
+      class_eval <<~RUBY, __FILE__, __LINE__ + 1
+        def #{name}                                     # def timeout
+          to_h[:#{name}]                                #   to_h[:timeout]
+        end                                             # end
+
+        def #{name}=(value)                             # def timeout=(value)
+          @programmatic["#{name}"] = wire(value)        #   @programmatic["timeout"] = wire(value)
+        end                                             # end
+      RUBY
     end
 
     def set_cli_option(key, value)

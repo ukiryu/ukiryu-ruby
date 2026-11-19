@@ -11,11 +11,14 @@ module Ukiryu
   # environment. It goes away once the core detects the host itself.
   module Host
     UNIX_SHELL_SUFFIXES = %w[bash zsh fish sh dash tcsh].freeze
+    # Read once: RbConfig::CONFIG is not shareable, so non-main Ractors
+    # cannot read it.
+    HOST_OS = RbConfig::CONFIG["host_os"].dup.freeze
 
     module_function
 
     def platform
-      host_os = RbConfig::CONFIG["host_os"]
+      host_os = HOST_OS
       case host_os
       when /mswin|mingw|cygwin|windows/i then :windows
       when /darwin|mac os/i then :macos

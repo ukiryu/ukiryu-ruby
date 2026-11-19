@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "ractor_local"
 require_relative "ffi/errors"
 require_relative "ffi/value"
 require_relative "ffi/library"
@@ -27,18 +28,26 @@ module Ukiryu
     # Platform gems vendor the cdylib here, next to this file.
     VENDOR_DIR = File.expand_path("ffi", __dir__)
 
+    # Loaded by the main Ractor only. The ffi gem cannot bind a library
+    # inside another Ractor, so when the main Ractor loads one it also
+    # publishes a second, Ractor-shareable binding of the same path in
+    # @shared_library, which every other Ractor uses.
     @mutex = Mutex.new
     @library = nil
     @load_error = nil
+    @shared_library = nil
 
     class << self
       # The bound library, loaded on first use. Raises LibraryNotFound or
-      # AbiMismatch when no usable library exists.
+      # AbiMismatch when no usable library exists. In a non-main Ractor it
+      # is the main Ractor's shared binding, or Error when the main Ractor
+      # has not loaded the library.
       def library
+        return shared_library unless RactorLocal.main?
         return @library if @library
 
         @mutex.synchronize do
-          @library ||= Library.locate
+          @library ||= Library.locate.tap { |loaded| publish(loaded.path) }
         rescue Error => e
           @load_error = e
           raise
@@ -53,14 +62,20 @@ module Ukiryu
         false
       end
 
-      # The failure of the last load attempt, if any.
-      attr_reader :load_error
+      # The failure of the main Ractor's last load attempt, if any.
+      def load_error
+        RactorLocal.main? ? @load_error : nil
+      end
 
-      # Forget the loaded library so the next call locates it again.
+      # Forget the loaded library so the next call locates it again. Only
+      # the main Ractor loads; elsewhere this does nothing.
       def reset!
+        return unless RactorLocal.main?
+
         @mutex.synchronize do
           @library = nil
           @load_error = nil
+          @shared_library = nil
         end
       end
 
@@ -93,6 +108,25 @@ module Ukiryu
         raise WireError.from_reply(reply) unless reply["ok"] == true
 
         reply.slice("version", "abi_version")
+      end
+
+      private
+
+      # A frozen binding for other Ractors. The main Ractor's own @library
+      # stays unfrozen, so specs can still observe its functions. A runtime
+      # or ffi version that cannot share it leaves @shared_library nil.
+      def publish(path)
+        return unless defined?(::Ractor)
+
+        @shared_library = ::Ractor.make_shareable(Library.new(path))
+      rescue StandardError
+        @shared_library = nil
+      end
+
+      def shared_library
+        @shared_library or
+          raise Error, "the ffi tier is loaded by the main Ractor: call Ukiryu::Ffi.library there " \
+                       "before using the ffi tier in another Ractor"
       end
     end
   end
