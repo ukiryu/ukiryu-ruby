@@ -22,7 +22,11 @@ module ReadmeTranscript
     { Dir.pwd => "<WORK>", REGISTER => "<REGISTER>", Dir.home => "<HOME>" }.each do |path, mark|
       text = text.gsub(path, mark)
     end
-    text
+    # A file source embeds the temporary directory's SHA256 and its mtime.
+    # Preserve the diagnostic itself while scrubbing these unstable values
+    # identically for the original gem and the native binding.
+    text.gsub(/file:file:[a-f0-9]{64}:\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [+-]\d{4}/,
+              "file:file:<PATH_SHA256>:<Time>")
   end
 
   def render(value)
