@@ -1,6 +1,5 @@
 # doc: docs/getting-started/core-concepts.adoc:393
 # doc: docs/getting-started/core-concepts.adoc:444
-# needs: Ruby platform API (Ukiryu::Platform) and Ukiryu.configure
 show(:detect) { Ukiryu::Platform.detect }
 show(:macos) { Ukiryu::Platform.macos? }
 show(:linux) { Ukiryu::Platform.linux? }

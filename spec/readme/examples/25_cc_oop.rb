@@ -1,5 +1,5 @@
 # doc: docs/getting-started/core-concepts.adoc:87
-# needs: generated OOP tool classes (Ukiryu::Tools const_missing)
+# needs: generated OOP tool classes (Ukiryu::Tools const_missing; option, action and response classes need the profile model, which no core op returns)
 tool = show(:new) { Ukiryu::Tools::Imagemagick.new }
 
 convert_options = show(:options_for) { tool.options_for(:convert) }

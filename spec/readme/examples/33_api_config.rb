@@ -1,7 +1,7 @@
 # doc: docs/interfaces/ruby-api.adoc:100
 # doc: docs/interfaces/ruby-api.adoc:113
 # doc: docs/interfaces/ruby-api.adoc:129
-# needs: Ukiryu::Executor
+# needs: Ukiryu::Executor (raw process execution; the core's execute op runs tool commands only)
 # The doc's '/path/to/register' is the test register.
 show(:set_register) { Ukiryu::Register.default_register_path = REGISTER }
 show(:default_timeout) { Ukiryu::Executor::DEFAULT_TIMEOUT }

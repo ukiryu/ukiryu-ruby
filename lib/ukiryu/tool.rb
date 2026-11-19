@@ -52,9 +52,9 @@ module Ukiryu
         load_from_string(yaml_string, options)
       end
 
+      # Empties the tool cache and returns it, as the original.
       def clear_cache
         tools_cache.clear
-        nil
       end
 
       def clear_definition_cache
