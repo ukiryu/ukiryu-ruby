@@ -421,7 +421,7 @@ dependencies = [
 [[package]]
 name = "ukiryu"
 version = "0.1.0"
-source = "git+https://github.com/ukiryu/ukiryu-rs?rev=79ac7ace697d983ad829254c4ba60d5df2092d31#79ac7ace697d983ad829254c4ba60d5df2092d31"
+source = "git+https://github.com/ukiryu/ukiryu-rs?rev=dafa80baf409713a42c4ff4cd502f3ab7e9bf23d#dafa80baf409713a42c4ff4cd502f3ab7e9bf23d"
 dependencies = [
  "cc",
  "magnus",

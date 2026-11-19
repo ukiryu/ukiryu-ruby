@@ -21,4 +21,4 @@ magnus = "0.9"
 # dependency, for example
 #   ukiryu = { version = "=0.1.0", features = ["ruby"] }
 # with a comment naming the ukiryu-rs release that carries each fix.
-ukiryu = { git = "https://github.com/ukiryu/ukiryu-rs", rev = "79ac7ace697d983ad829254c4ba60d5df2092d31", features = ["ruby"] }
+ukiryu = { git = "https://github.com/ukiryu/ukiryu-rs", rev = "dafa80baf409713a42c4ff4cd502f3ab7e9bf23d", features = ["ruby"] }
