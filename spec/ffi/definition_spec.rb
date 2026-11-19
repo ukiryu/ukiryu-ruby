@@ -54,6 +54,16 @@ RSpec.describe "native Definition facade" do
     expect(missing.errors.first.message).to eq("File not found: s276-missing-definition.yaml")
   end
 
+  it "expands metadata paths using Ruby's filesystem conventions" do
+    path = File.join("definitions", "echo", "1.0.yaml")
+    native_path = File::ALT_SEPARATOR ? path.tr("/", File::ALT_SEPARATOR) : path
+    metadata = Ukiryu::Definition::DefinitionMetadata.new(
+      "name" => "echo", "version" => "1.0", "path" => native_path, "source_type" => "user"
+    )
+
+    expect(metadata.path).to eq(File.join(Dir.pwd, path))
+  end
+
   it "discovers versioned XDG definitions as native metadata and loads them" do
     previous = ENV["XDG_DATA_HOME"]
     Dir.mktmpdir("ukiryu-discovery-") do |directory|

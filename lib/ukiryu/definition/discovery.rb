@@ -8,6 +8,7 @@ module Ukiryu
 
       def initialize(value)
         @name, @version, @path = value.values_at("name", "version", "path")
+        @path = File.expand_path(@path)
         @source_type = value.fetch("source_type").to_sym
       end
 
