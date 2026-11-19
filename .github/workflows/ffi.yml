@@ -116,6 +116,7 @@ jobs:
           sparse-checkout: |
             corpus/conformance
             tests/escape-wire
+            ukiryu/tests/conformance
       - uses: actions/download-artifact@v4
         with:
           name: cdylib-${{ matrix.os }}
