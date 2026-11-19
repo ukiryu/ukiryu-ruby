@@ -79,15 +79,20 @@ jobs:
         if: ${{ !matrix.container }}
         run: cargo build --release --locked --manifest-path ${{ env.MANIFEST }}
       # musl: build in the official Alpine Rust image, on the runner's own
-      # architecture. A cdylib on musl needs -crt-static.
+      # architecture. A cdylib on musl needs -crt-static. The image ships
+      # without the C runtime objects (crti.o, Scrt1.o), so install musl-dev
+      # as root first and hand the outputs back to the runner user.
       - name: Build cdylib (musl)
         if: ${{ matrix.container }}
         run: |
-          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work \
+          docker run --rm -v "$PWD:/work" -w /work \
             -e CARGO_HOME=/work/.cargo-musl \
             -e RUSTFLAGS="-C target-feature=-crt-static" \
+            -e OWNER="$(id -u):$(id -g)" \
             rust:1.86-alpine \
-            cargo build --release --locked --manifest-path ${{ env.MANIFEST }}
+            sh -euc 'apk add --no-cache musl-dev
+              cargo build --release --locked --manifest-path "$1"
+              chown -R "$OWNER" target .cargo-musl' sh ${{ env.MANIFEST }}
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.4'
