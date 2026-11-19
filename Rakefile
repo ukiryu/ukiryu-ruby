@@ -32,7 +32,9 @@ RbSys::ExtensionTask.new("ukiryu_native", GEMSPEC) do |ext|
     platform = spec.platform.to_s
     entry = PLATFORMS.find { |p| p["platform"] == platform } or raise "#{platform} is not in release/platforms.json"
     triple = RbSys::ToolchainInfo::DATA.fetch(platform).fetch("rust-target")
-    sh "cargo", "build", "--release", "--locked", "-p", "ukiryu_cdylib", "--target", triple
+    # A cdylib on musl needs the C runtime linked dynamically.
+    env = triple.end_with?("-musl") ? { "RUSTFLAGS" => "#{ENV['RUSTFLAGS']} -C target-feature=-crt-static".strip } : {}
+    sh env, "cargo", "build", "--release", "--locked", "-p", "ukiryu_cdylib", "--target", triple
     library = "target/#{triple}/release/#{entry['library']}"
     raise "cdylib not found: #{library}" unless File.file?(library)
 

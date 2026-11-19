@@ -9,13 +9,12 @@ require_relative "readme_examples"
 # fail on the original too (for example `execute(:x, {..})` without
 # execution_timeout:); the transcripts record those failures, so matching
 # them is part of parity.
-RSpec.describe "README examples" do
+RSpec.describe "README and docs examples" do
   oracle_dir = ENV.fetch("UKIRYU_README_ORACLE", nil)
   lib = File.expand_path("../../lib", __dir__)
 
   ReadmeExamples.all.each do |example|
-    lines = example.readme_lines.join(", ")
-    it "#{example.name} (README.adoc lines #{lines}) prints what the original prints" do
+    it "#{example.name} (#{example.sources.join(', ')}) prints what the original prints" do
       skip "UKIRYU_README_ORACLE is not set" unless oracle_dir
 
       expected = File.read(File.join(oracle_dir, "#{example.name}.txt"))
