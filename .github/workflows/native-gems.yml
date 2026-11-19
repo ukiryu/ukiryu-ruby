@@ -90,9 +90,11 @@ jobs:
           name: native-gem-${{ matrix.platform }}
           path: pkg
       - uses: ruby/setup-ruby@v1
+        if: ${{ !matrix.container }}
         with:
           ruby-version: "3.4"
       - name: Install into a clean GEM_HOME
+        if: ${{ !matrix.container }}
         shell: bash
         run: |
           export GEM_HOME="$RUNNER_TEMP/gemhome" GEM_PATH="$RUNNER_TEMP/gemhome"
@@ -100,6 +102,7 @@ jobs:
           gem install --no-document --verbose pkg/*.gem
           gem list ukiryu
       - name: Native specs against the installed gem
+        if: ${{ !matrix.container }}
         shell: bash
         run: |
           export GEM_HOME="$RUNNER_TEMP/gemhome" GEM_PATH="$RUNNER_TEMP/gemhome"
@@ -107,3 +110,19 @@ jobs:
           cp -R spec/native "$RUNNER_TEMP/run/specs/"
           cd "$RUNNER_TEMP/run/specs"
           ruby -rrspec/core -e 'exit RSpec::Core::Runner.run(ARGV)' -- --format documentation native
+      # musl gems cannot be installed on the glibc host Ruby: install and run
+      # the same specs inside an Alpine Ruby container.
+      - name: Install and run native specs (musl container)
+        if: ${{ matrix.container }}
+        run: |
+          docker run --rm -v "$PWD/pkg:/pkg:ro" -v "$PWD/spec/native:/native:ro" ${{ matrix.container }} sh -ec '
+            apk add --no-cache build-base libffi-dev
+            export GEM_HOME=/tmp/gemhome GEM_PATH=/tmp/gemhome
+            gem install --no-document rspec
+            gem install --no-document --verbose /pkg/*.gem
+            gem list ukiryu
+            mkdir -p /tmp/run/specs
+            cp -R /native /tmp/run/specs/native
+            cd /tmp/run/specs
+            ruby -rrspec/core -e "exit RSpec::Core::Runner.run(ARGV)" -- --format documentation native
+          '
