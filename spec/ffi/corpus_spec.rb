@@ -66,24 +66,6 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
   r2_rule_ops = %w[lint.string yaml.load yaml.model_load yaml.lutaml_roundtrip].freeze
   r2_rule_rows = 25
 
-  # Rows that fail at the pinned core commit because of a known core defect,
-  # each with its reason and the exact failure it must show. The YAML
-  # parser message rows that differed at 4827c94 are gone at 5624583 (its
-  # yeptris 0.6.72 gives Psych's messages). Both rows below hold a one-key
-  # {"$ref" => ...} Hash: at the top for the tool schema, nested in the
-  # interface schema. They are the only rows declared; an example below
-  # fails if the list grows, if a row starts passing or if it fails for any
-  # other reason.
-  ref_defect = {
-    reason: "core encoder sends a one-key $-prefixed Hash unescaped; decoders reject it; " \
-            "owner decision on ukiryu/ukiryu#23",
-    failure: "reply value does not decode: unknown value tag $ref"
-  }.freeze
-  known_core_divergences = {
-    "yaml.load.fixture-schema-tool-schema" => ref_defect,
-    "yaml.load.schemas-v1-interface-schema" => ref_defect
-  }.freeze
-
   rows = lambda do |kind|
     File.readlines(File.join(corpus, "cases", "#{kind}.jsonl"), chomp: true)
         .reject { |line| line.strip.empty? }.map { |line| JSON.parse(line) }
@@ -311,21 +293,11 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
     end
     expect(dispatched).to eq(pinned)
     expect(decoded).to be > 1000
-    unexpected = failures.reject { |id, _| known_core_divergences.key?(id) }
-    expect(unexpected).to be_empty, -> { "#{unexpected.size} rows differ:\n#{unexpected.map { |id, d| "#{id}:\n  #{d}" }.join("\n")}" }
-    # A declared row fails only with its declared failure, and when the core
-    # fixes it, it must leave the list with the pin.
-    expect(failures).to eq(known_core_divergences.transform_values { |d| d.fetch(:failure) })
-  end
-
-  it "declares only the known core $ref divergence" do
-    expect(known_core_divergences.keys).to eq(%w[yaml.load.fixture-schema-tool-schema
-                                                 yaml.load.schemas-v1-interface-schema])
-    known_core_divergences.each_value do |d|
-      expect(d.fetch(:reason)).to include("ukiryu/ukiryu#23")
-    end
-    ids = %w[build validate schema resolve lint yaml].flat_map { |kind| rows.(kind).map { |row| row["id"] } }
-    expect(ids).to include(*known_core_divergences.keys)
+    # Every yaml.load row matches, including the two JSON schemas that hold
+    # a lone {"$ref" => ...} Hash.
+    yaml_ids = rows.("yaml").select { |row| row["op"] == "yaml.load" }.map { |row| row["id"] }
+    expect(yaml_ids.size - failures.keys.count { |id| yaml_ids.include?(id) }).to eq(81)
+    expect(failures).to be_empty, -> { "#{failures.size} rows differ:\n#{failures.map { |id, d| "#{id}:\n  #{d}" }.join("\n")}" }
   end
 
   it "returns every escape row through the wire" do

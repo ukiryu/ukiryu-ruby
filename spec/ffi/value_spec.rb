@@ -75,7 +75,6 @@ RSpec.describe Ukiryu::Ffi::Value do
     expect { described_class.encode(Object.new) }.to raise_error(Ukiryu::Ffi::EncodingError)
     expect { described_class.decode(1.5) }.to raise_error(Ukiryu::Ffi::EncodingError)
     expect { described_class.decode("$float" => "1.50") }.to raise_error(Ukiryu::Ffi::EncodingError)
-    expect { described_class.decode("$nope" => 1) }.to raise_error(Ukiryu::Ffi::EncodingError)
     expect { described_class.decode("$time" => "2023-02-30T00:00:00.000000000Z") }
       .to raise_error(Ukiryu::Ffi::EncodingError)
   end
@@ -123,9 +122,15 @@ RSpec.describe Ukiryu::Ffi::Value do
     expect(described_class.decode("$sym" => "a", "b" => { "$int" => "1" })).to eq("$sym" => "a", "b" => 1)
   end
 
-  it "refuses a one-key object whose $ key is not a tag" do
-    expect { described_class.decode("$x" => 1) }.to raise_error(Ukiryu::Ffi::EncodingError, /unknown value tag \$x/)
-    expect { described_class.decode("$ref" => "#/definitions/option") }
-      .to raise_error(Ukiryu::Ffi::EncodingError, /unknown value tag \$ref/)
+  it "reads a one-key object whose $ key is not a tag as a Hash" do
+    expect(described_class.decode("$x" => 1)).to eq("$x" => 1)
+    expect(described_class.decode("$ref" => "#/definitions/option")).to eq("$ref" => "#/definitions/option")
+    expect(described_class.decode("a" => { "$ref" => { "$sym" => "b" } })).to eq("a" => { "$ref" => :b })
+  end
+
+  it "writes a lone $ref Hash as $map, which reads back as the Hash" do
+    hash = { "$ref" => "#/x" }
+    expect(described_class.encode(hash)).to eq("$map" => [["$ref", "#/x"]])
+    expect(described_class.decode(JSON.parse(JSON.generate(described_class.encode(hash))))).to eq(hash)
   end
 end
