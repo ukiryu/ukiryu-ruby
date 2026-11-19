@@ -111,6 +111,30 @@ module Ukiryu
       @identity["commands"]
     end
 
+    # The definition selected by the native loader, distinct from the detected
+    # executable version. Nested commands remain native model views.
+    def profile
+      load_profile unless @profile
+      @profile
+    end
+
+    def command_profile
+      load_profile unless @command_profile
+      @command_profile
+    end
+
+    def commands
+      command_profile.commands
+    end
+
+    def command_definition(name)
+      command_profile.command(name)
+    end
+
+    def command?(name)
+      !command_definition(name).nil?
+    end
+
     def definition_path
       @definition_source&.path if @definition_source.respond_to?(:path)
     end
@@ -141,6 +165,17 @@ module Ukiryu
     end
 
     private
+
+    def build_command(name, params)
+      Bridge.request("op" => "build", "tool" => tool_request,
+                     "command" => name.to_s, "params" => Ffi::Value.encode(params))
+    end
+
+    def load_profile
+      value = Bridge.request({ "op" => "resolve", "method" => "tool_profile" }.merge(tool_request))
+      @profile = Models::ToolDefinition.new(value.fetch("definition"))
+      @command_profile = @profile.profiles.fetch(value.fetch("profile_index"))
+    end
 
     def tool_request
       @request
