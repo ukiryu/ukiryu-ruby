@@ -35,6 +35,7 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
     "resolve.extract_version" => 372,
     "resolve.range" => 68,
     "resolve.version_spec" => 130,
+    "resolve.shell_detect" => 17,
     "lint.string" => 70,
     "yaml.load" => 81,
     "yaml.model_load" => 62,
@@ -53,18 +54,16 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
 
   # Ops this spec does not run, with the reason.
   not_dispatched = {
-    "resolve.shell_detect" => [17, "host shell detection is not on the wire (owner decision D2 open)"],
     "cli.run" => [21, "CLI process rows belong to the CLI binary, not the library API"]
   }.freeze
 
   manifest_total = 14_177
 
   # Ops whose rows the R2 rule files judge here, and how many rows the rules
-  # list among them. Other listed rows (the schema and shell detection
-  # migrations) are not applied by this spec and keep their frozen
-  # expectations.
-  r2_rule_ops = %w[lint.string yaml.load yaml.model_load yaml.lutaml_roundtrip].freeze
-  r2_rule_rows = 25
+  # list among them. Shell detection also applies the traced D2 migrations;
+  # schema rows keep their frozen expectations.
+  r2_rule_ops = %w[lint.string yaml.load yaml.model_load yaml.lutaml_roundtrip resolve.shell_detect].freeze
+  r2_rule_rows = 35
 
   rows = lambda do |kind|
     File.readlines(File.join(corpus, "cases", "#{kind}.jsonl"), chomp: true)
@@ -101,6 +100,11 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
     when "resolve.range"
       { "op" => "resolve", "method" => "range", "scheme" => i["scheme"], "range" => i["range"],
         "bounds" => i["bounds"], "version" => i["version"] }
+    when "resolve.shell_detect"
+      # The corpus captures Unix detection. Explicit virtual platforms run
+      # all 17 rows on Windows too, without reading the CI host environment.
+      { "op" => "resolve", "method" => "shell_detect",
+        "platform" => row.fetch("applicability").fetch("platforms").first, "env" => i.fetch("env") }
     when "resolve.version_spec"
       { "op" => "resolve", "method" => "version_spec",
         "index" => read_input.("register/tools/#{i.fetch('tool')}/index.yaml"),
@@ -272,7 +276,8 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
           expect(request.(row)).to be_nil
           next
         end
-        expect(row.dig("applicability", "platforms")).to include(host)
+        platform = row["op"] == "resolve.shell_detect" ? request.(row).fetch("platform") : host
+        expect(row.dig("applicability", "platforms")).to include(platform)
         expect(row.dig("applicability", "requires")).to eq([]), row["id"]
         dispatched[row["op"]] += 1
         reply = call.(row)
@@ -297,7 +302,9 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
     # a lone {"$ref" => ...} Hash.
     yaml_ids = rows.("yaml").select { |row| row["op"] == "yaml.load" }.map { |row| row["id"] }
     expect(yaml_ids.size - failures.keys.count { |id| yaml_ids.include?(id) }).to eq(81)
-    expect(failures).to be_empty, -> { "#{failures.size} rows differ:\n#{failures.map { |id, d| "#{id}:\n  #{d}" }.join("\n")}" }
+    expect(failures).to be_empty, lambda {
+      "#{failures.size} rows differ:\n#{failures.map { |id, d| "#{id}:\n  #{d}" }.join("\n")}"
+    }
   end
 
   it "returns every escape row through the wire" do
@@ -317,7 +324,9 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
     end
     failures = cases.filter_map do |id, req, want|
       reply = Ukiryu::Ffi.call(req)
-      "#{id}: want #{JSON.generate(want)}, got #{JSON.generate(reply)}" unless reply == { "ok" => true, "value" => want }
+      next if reply == { "ok" => true, "value" => want }
+
+      "#{id}: want #{JSON.generate(want)}, got #{JSON.generate(reply)}"
     end
     expect(failures).to be_empty, -> { "#{failures.size} of #{cases.size} differ:\n#{failures.first(12).join("\n")}" }
   end
