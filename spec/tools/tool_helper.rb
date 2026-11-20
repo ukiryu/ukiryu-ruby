@@ -11,6 +11,7 @@
 # ~/.ukiryu/register. The PNG fixtures are copies of the original's
 # spec/fixtures/images.
 require "fileutils"
+require "json"
 require "rbconfig"
 require "tmpdir"
 require "ukiryu"
@@ -83,6 +84,7 @@ module ToolHelper
 
     require "tmpdir"
     require "fileutils"
+require "json"
     dir = Dir.mktmpdir("ukiryu_mogrify_probe")
     src = File.join(dir, "src.png")
     ok = system(magick, "-size", "4x4", "xc:white", "png:#{src}",
