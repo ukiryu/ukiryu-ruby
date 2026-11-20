@@ -77,6 +77,15 @@ module Ukiryu
         JSON.parse(call_json(text))
       end
 
+      # Capture the Rust CLI's stdout, stderr and exit status in process.
+      # argv omits the program name. env is a complete snapshot, not an
+      # overlay; the dispatcher never changes ENV or cwd. Files/subprocesses
+      # remain real, relative paths use the caller's cwd, and stdin is empty.
+      def cli(argv, platform: RUBY_PLATFORM, env: ENV.to_h)
+        request = JSON.generate("argv" => argv, "platform" => platform, "env" => env)
+        JSON.parse(library.call(request, cli: true))
+      end
+
       # One call whose reply value uses the typed encoding (resolve, build,
       # validate, schema, results, execute, escape). Returns the decoded
       # value, or raises WireError with the core's code and Ruby class.

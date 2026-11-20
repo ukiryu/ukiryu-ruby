@@ -70,7 +70,7 @@ jobs:
             macOS) syms=$(nm -gU "$lib") ;;
             Windows) syms=$(dumpbin.exe //EXPORTS "$lib" 2>/dev/null || objdump -p "$lib") ;;
           esac
-          for sym in ukiryu_abi_version ukiryu_json ukiryu_free; do
+          for sym in ukiryu_abi_version ukiryu_json ukiryu_free ukiryu_cli_json; do
             grep -Eq "(^|[ _])${sym}\$" <<<"$syms" || { echo "::error::missing export $sym"; echo "$syms" | head -50; exit 1; }
             echo "exported: $sym"
           done
@@ -223,9 +223,9 @@ jobs:
       matrix:
         include:
           - os: ubuntu-24.04
-            require: ghostscript,inkscape
+            require: ghostscript,inkscape,ffmpeg,jq,ping_gnu
           - os: macos-15
-            require: imagemagick,ghostscript
+            require: imagemagick,ghostscript,ffmpeg,jq,ping_bsd
     steps:
       - uses: actions/checkout@v4
       - name: Original register
@@ -239,15 +239,18 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends imagemagick ghostscript inkscape
+          sudo apt-get install -y --no-install-recommends imagemagick ghostscript inkscape ffmpeg jq iputils-ping
       - name: Tools (Homebrew)
         if: runner.os == 'macOS'
-        run: brew install imagemagick ghostscript
+        run: brew install imagemagick ghostscript ffmpeg jq
       - name: Tool versions
         shell: bash
         run: |
           magick -version || convert -version
           gs --version
+          ffmpeg -version
+          jq --version
+          command -v ping
           if command -v inkscape >/dev/null; then inkscape --version; fi
           if command -v pwsh >/dev/null; then pwsh -Version; fi
       - uses: actions/download-artifact@v4

@@ -47,6 +47,22 @@ RSpec.describe Ukiryu::Transport do
     expect(Ukiryu::Errors::TimeoutError.ancestors).to include(Ukiryu::Errors::Error)
   end
 
+  it "keeps cached Ruby objects and formats shells through the installed native tier" do
+    expect(Ukiryu::Transport.tier).to eq(:native)
+    cache = Ukiryu::Cache.new(max_size: 2, ttl: 3600)
+    object = Object.new
+    cache[:object] = object
+    expect(cache[:object]).to equal(object)
+    expect(cache.stats[:size]).to eq(1)
+    expect(cache.delete(:object)).to equal(object)
+    expect(cache.empty?).to be(true)
+    shell = Ukiryu::Shell::InstanceCache.instance_for(:bash)
+    expect(Ukiryu::Shell::InstanceCache.instance_for(:bash)).to equal(shell)
+    expect(shell.quote("a b")).to eq("'a b'")
+  ensure
+    Ukiryu::Shell::InstanceCache.clear
+  end
+
   it "honours UKIRYU_TIER=ffi" do
     ENV[Ukiryu::Transport::ENV_TIER] = "ffi"
     Ukiryu::Transport.reset!
