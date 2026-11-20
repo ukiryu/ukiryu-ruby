@@ -452,7 +452,7 @@ dependencies = [
 [[package]]
 name = "ukiryu"
 version = "0.1.0"
-source = "git+https://github.com/ukiryu/ukiryu-rs?rev=893af7baed9f8a62186274da97e5c74210e39782#893af7baed9f8a62186274da97e5c74210e39782"
+source = "git+https://github.com/ukiryu/ukiryu-rs?rev=edc45d68e5aebc2497a31164b0188af8cd56574b#edc45d68e5aebc2497a31164b0188af8cd56574b"
 dependencies = [
  "cc",
  "magnus",
@@ -467,7 +467,7 @@ dependencies = [
 [[package]]
 name = "ukiryu-cli"
 version = "0.1.0"
-source = "git+https://github.com/ukiryu/ukiryu-rs?rev=893af7baed9f8a62186274da97e5c74210e39782#893af7baed9f8a62186274da97e5c74210e39782"
+source = "git+https://github.com/ukiryu/ukiryu-rs?rev=edc45d68e5aebc2497a31164b0188af8cd56574b#edc45d68e5aebc2497a31164b0188af8cd56574b"
 dependencies = [
  "clap",
  "serde",
