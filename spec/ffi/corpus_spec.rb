@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "digest"
+require "tmpdir"
 require_relative "ffi_helper"
 
 # The conformance corpus through the C ABI: the same row mapping as the
@@ -9,10 +10,9 @@ require_relative "ffi_helper"
 # The corpus is the pinned core checkout's corpus/conformance
 # (UKIRYU_CONFORMANCE_DIR).
 #
-# Every corpus op is either dispatched here or declared in not_dispatched
-# with its count and the reason it has no wire operation. Together they must
-# cover the manifest total, so a new or grown kind fails until it is run or
-# declared.
+# Every corpus op is dispatched, with its count pinned. A new or grown kind
+# fails until this consumer runs it deliberately. CLI rows use the same Rust
+# dispatcher as the executable, captured through this gem's C ABI binding.
 #
 # Root ruling R2 rows of the lint and yaml kinds are judged by the core
 # conformance consumer's rule files, read unchanged from the same checkout
@@ -52,10 +52,7 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
     "shell.quote" => 3912
   }.freeze
 
-  # Ops this spec does not run, with the reason.
-  not_dispatched = {
-    "cli.run" => [21, "CLI process rows belong to the CLI binary, not the library API"]
-  }.freeze
+  cli_pinned = { "cli.run" => 21 }.freeze
 
   manifest_total = 14_177
 
@@ -242,13 +239,13 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
 
   all_rows = %w[build cli-output escape lint resolve schema validate yaml].flat_map { |kind| rows.(kind) }
 
-  it "dispatches or declares every corpus op and pins the total" do
+  it "dispatches every corpus op and pins the total" do
     manifest = JSON.parse(File.read(File.join(corpus, "manifest.json")))
     expect(manifest.dig("cases", "total")).to eq(manifest_total)
     expect(all_rows.size).to eq(manifest_total)
     expect(all_rows.map { |row| row["kind"] }.tally).to eq(manifest.dig("cases", "by_kind"))
     ops = all_rows.map { |row| row["op"] }.tally
-    declared = pinned.merge(escape_pinned).merge(not_dispatched.transform_values(&:first))
+    declared = pinned.merge(escape_pinned).merge(cli_pinned)
     expect(ops).to eq(declared)
     expect(declared.values.sum).to eq(manifest_total)
   end
@@ -272,10 +269,6 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
     decoded = 0
     %w[build validate schema resolve lint yaml].each do |kind|
       rows.(kind).each do |row|
-        if not_dispatched.key?(row["op"])
-          expect(request.(row)).to be_nil
-          next
-        end
         platform = row["op"] == "resolve.shell_detect" ? request.(row).fetch("platform") : host
         expect(row.dig("applicability", "platforms")).to include(platform)
         expect(row.dig("applicability", "requires")).to eq([]), row["id"]
@@ -304,6 +297,45 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
     expect(yaml_ids.size - failures.keys.count { |id| yaml_ids.include?(id) }).to eq(81)
     expect(failures).to be_empty, lambda {
       "#{failures.size} rows differ:\n#{failures.map { |id, d| "#{id}:\n  #{d}" }.join("\n")}"
+    }
+  end
+
+  it "captures every CLI row through the binding with no exclusions" do
+    cli_rows = rows.("cli-output")
+    expect(cli_rows.map { |row| row["op"] }.tally).to eq(cli_pinned)
+    expect(cli_rows.size).to eq(21)
+    failures = {}
+    Dir.mktmpdir("ukiryu-cli-corpus") do |home|
+      # The corpus was captured on Linux. Supply that explicit host snapshot
+      # on every CI OS; these rows render or dry-run without running a tool.
+      # No shell or installed register executable is needed (PATH is empty).
+      environment = {
+        "HOME" => home, "TZ" => "UTC", "LANG" => "C.UTF-8", "LC_ALL" => "C.UTF-8",
+        "SHELL" => "/bin/bash", "PATH" => "", "COLUMNS" => "100", "THOR_COLUMNS" => "100",
+        "TERM" => "dumb", "UKIRYU_REGISTER" => input_path.("register")
+      }
+      cli_rows.each do |row|
+        expect(row.dig("applicability", "platforms")).to include("linux"), row["id"]
+        expect(row.dig("applicability", "requires")).to eq(%w[cli process fs]), row["id"]
+        argv = row.dig("input", "argv").map { |arg| arg.gsub("${INPUTS}", inputs) }
+        reply = Ukiryu::Ffi.cli(argv, platform: "linux", env: environment)
+        have = outcome.("cli.run", reply)
+        # Only the documented ${INPUTS}/${HOME} substitutions are allowed;
+        # stdout/stderr bytes and the exit status otherwise stay untouched.
+        home_bases = [home, home.tr("/", "\\")].uniq
+        home_scrub = lambda do |data|
+          case data
+          when String then home_bases.reduce(data) { |text, base| text.gsub(base, "${HOME}") }
+          when Hash then data.transform_values { |item| home_scrub.(item) }
+          else data
+          end
+        end
+        reason = differs.(home_scrub.(have), row["expect"])
+        failures[row["id"]] = reason if reason
+      end
+    end
+    expect(failures).to be_empty, -> {
+      "#{failures.size} CLI rows differ:\n#{failures.map { |id, detail| "#{id}:\n  #{detail}" }.join("\n")}"
     }
   end
 

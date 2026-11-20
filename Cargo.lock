@@ -466,10 +466,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "ukiryu-cli"
+version = "0.1.0"
+source = "git+https://github.com/ukiryu/ukiryu-rs?rev=a6ca3ab16605fad10b28e7333f6ee64d8a635c7f#a6ca3ab16605fad10b28e7333f6ee64d8a635c7f"
+dependencies = [
+ "clap",
+ "serde",
+ "serde_json",
+ "ukiryu",
+ "yeptris",
+]
+
+[[package]]
 name = "ukiryu_cdylib"
 version = "0.4.0"
 dependencies = [
  "ukiryu",
+ "ukiryu-cli",
 ]
 
 [[package]]
