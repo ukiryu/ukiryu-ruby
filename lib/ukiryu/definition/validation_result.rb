@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'json'
+
 module Ukiryu
   module Definition
     # Result of a definition validation
@@ -107,7 +109,6 @@ module Ukiryu
       #
       # @return [String] JSON representation
       def to_json(*args)
-        require 'json'
         to_h.to_json(*args)
       end
 
