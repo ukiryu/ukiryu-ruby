@@ -4,9 +4,8 @@ module Ukiryu
   # Ukiryu::Shell: shell names, detection and availability, as the original.
   #
   # Detection and availability look at the Ruby process (ENV, /etc/shells
-  # and `which`), as in the original. The original's per-shell quoting
-  # classes (Shell::Bash, Shell.class_for, Shell.register) are not here:
-  # quoting runs in the core.
+  # and `which`), as in the original. Per-shell classes delegate formatting
+  # to the core (shell/instances).
   module Shell
     PLATFORM_GROUPS = %i[unix windows powershell].freeze
     INDIVIDUAL_SHELLS = %i[bash zsh fish sh dash tcsh powershell cmd].freeze
@@ -116,6 +115,7 @@ module Ukiryu
 
       def reset
         @current_shell = nil
+        @shell_class = nil
       end
 
       private
