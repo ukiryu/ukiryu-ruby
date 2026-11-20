@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Invoked inside an isolated distro container by docker-test-all.sh.
 set -euo pipefail
+# The CLI requires an explicit shell; Docker's non-login bash does not export it.
+export SHELL=/bin/bash
 export GEM_HOME=/tmp/ukiryu-gem GEM_PATH=/tmp/ukiryu-gem HOME=/tmp/ukiryu-home
 mkdir -p "$GEM_HOME" "$HOME" /tmp/consumer
 unset RUBYLIB UKIRYU_FFI_LIB UKIRYU_TIER
