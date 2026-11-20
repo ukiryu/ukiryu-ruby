@@ -10,7 +10,7 @@ require "ukiryu"
 # what ukiryu/ukiryu @ ab6df353 returned or raised, captured on Linux with
 # bash by that file's capture_executor_wire.rb.
 RSpec.describe Ukiryu::Executor, if: FfiSpecHelper.host == "linux" do
-  data = JSON.parse(File.read(File.join(__dir__, "fixtures", "executor_wire.json")))
+  data = JSON.parse(File.read(File.join(__dir__, "fixtures", "executor_wire.json"), encoding: "UTF-8"))
 
   def call(options, dir)
     opts = {}

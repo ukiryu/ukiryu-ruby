@@ -63,7 +63,7 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
   r2_rule_rows = 35
 
   rows = lambda do |kind|
-    File.readlines(File.join(corpus, "cases", "#{kind}.jsonl"), chomp: true)
+    File.readlines(File.join(corpus, "cases", "#{kind}.jsonl"), chomp: true, encoding: "UTF-8")
         .reject { |line| line.strip.empty? }.map { |line| JSON.parse(line) }
   end
   input_path = ->(rel) { File.join(inputs, rel) }
@@ -157,7 +157,7 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
     { "ok" => scrub.(ok) }
   end
 
-  rule_file = ->(name) { JSON.parse(File.read(File.join(rules_dir, name))) }
+  rule_file = ->(name) { JSON.parse(File.read(File.join(rules_dir, name), encoding: "UTF-8")) }
   migrated = rule_file.("migrated.json")["rows"].to_h { |m| [m["id"], m] }
   projection = rule_file.("projection.json")
   classes = projection["classes"].to_h { |c| [c["class"], c] }
@@ -240,7 +240,7 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
   all_rows = %w[build cli-output escape lint resolve schema validate yaml].flat_map { |kind| rows.(kind) }
 
   it "dispatches every corpus op and pins the total" do
-    manifest = JSON.parse(File.read(File.join(corpus, "manifest.json")))
+    manifest = JSON.parse(File.read(File.join(corpus, "manifest.json"), encoding: "UTF-8"))
     expect(manifest.dig("cases", "total")).to eq(manifest_total)
     expect(all_rows.size).to eq(manifest_total)
     expect(all_rows.map { |row| row["kind"] }.tally).to eq(manifest.dig("cases", "by_kind"))
@@ -340,7 +340,7 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
   end
 
   it "returns every escape row through the wire" do
-    manifest = JSON.parse(File.read(File.join(corpus, "manifest.json")))
+    manifest = JSON.parse(File.read(File.join(corpus, "manifest.json"), encoding: "UTF-8"))
     cases = rows.("escape").map do |row|
       operation = row["input"].dup
       shell = operation.delete("shell")
@@ -350,7 +350,7 @@ RSpec.describe "Ukiryu::Ffi conformance corpus" do
     expect(cases.size).to eq(manifest.dig("cases", "by_kind", "escape"))
     expect(rows.("escape").map { |row| row["op"] }.tally).to eq(escape_pinned)
     supplemental = File.expand_path("../../tests/escape-wire/supplemental.jsonl", corpus)
-    File.readlines(supplemental, chomp: true).reject(&:empty?).each do |line|
+    File.readlines(supplemental, chomp: true, encoding: "UTF-8").reject(&:empty?).each do |line|
       row = JSON.parse(line)
       cases << [row["id"], row["request"], row["value"]]
     end

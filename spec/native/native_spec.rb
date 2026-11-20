@@ -22,7 +22,11 @@ RSpec.describe Ukiryu::Transport do
   it "loads the extension from the installed gem, not from the checkout" do
     feature = $LOADED_FEATURES.find { |f| f =~ %r{ukiryu/(\d+\.\d+/)?ukiryu_native\.(so|bundle|dll)\z} }
     expect(feature).not_to be_nil
-    expect(feature).not_to start_with(File.expand_path("../..", __dir__))
+    feature = File.expand_path(feature)
+    checkout = File.expand_path(ENV.fetch("UKIRYU_CHECKOUT_ROOT")) + File::SEPARATOR
+    installed = File.expand_path(Gem.loaded_specs.fetch("ukiryu").full_gem_path) + File::SEPARATOR
+    expect(feature).to start_with(installed)
+    expect(feature).not_to start_with(checkout)
   end
 
   it "answers each request with the bytes the ffi tier returns" do

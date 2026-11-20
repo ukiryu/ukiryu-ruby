@@ -107,6 +107,8 @@ jobs:
       - name: Native specs against the installed gem
         if: ${{ !matrix.container }}
         shell: bash
+        env:
+          UKIRYU_CHECKOUT_ROOT: ${{ github.workspace }}
         run: |
           export GEM_HOME="$RUNNER_TEMP/gemhome" GEM_PATH="$RUNNER_TEMP/gemhome"
           mkdir -p "$RUNNER_TEMP/run/specs"
@@ -118,14 +120,116 @@ jobs:
       - name: Install and run native specs (musl container)
         if: ${{ matrix.container }}
         run: |
-          docker run --rm -v "$PWD/pkg:/pkg:ro" -v "$PWD/spec/native:/native:ro" ${{ matrix.container }} sh -ec '
+          docker run --rm -v "$PWD/pkg:/pkg:ro" -v "$PWD:/ruby-consumer:ro" \
+            -e UKIRYU_CHECKOUT_ROOT=/ruby-consumer ${{ matrix.container }} sh -ec '
             apk add --no-cache build-base libffi-dev
             export GEM_HOME=/tmp/gemhome GEM_PATH=/tmp/gemhome
             gem install --no-document rspec
             gem install --no-document --verbose /pkg/*.gem
             gem list ukiryu
             mkdir -p /tmp/run/specs
-            cp -R /native /tmp/run/specs/native
+            cp -R /ruby-consumer/spec/native /tmp/run/specs/native
             cd /tmp/run/specs
             ruby -rrspec/core -e "exit RSpec::Core::Runner.run(ARGV)" -- --format documentation native
           '
+
+  docker-cli:
+    name: Docker CLI (${{ matrix.libc }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {libc: gnu, os: ubuntu-22.04, target: x86_64-unknown-linux-gnu}
+          - {libc: musl, os: ubuntu-24.04, target: x86_64-unknown-linux-musl}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the gem's qualified core revision
+        id: core
+        shell: bash
+        run: |
+          rev=$(sed -n 's/.*ukiryu-rs?rev=[0-9a-f]*#\([0-9a-f]\{40\}\).*/\1/p' Cargo.lock | head -1)
+          test -n "$rev"
+          echo "ref=$rev" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: ukiryu/ukiryu-rs
+          ref: ${{ steps.core.outputs.ref }}
+          path: core
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95.0
+          targets: ${{ matrix.target }}
+      - name: Install musl tools
+        if: matrix.libc == 'musl'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools
+      - name: Build the CLI from the gem's own core pin
+        working-directory: core
+        env:
+          CLI_TARGET: ${{ matrix.target }}
+          CARGO_BUILD_JOBS: 2
+          CC_x86_64_unknown_linux_musl: musl-gcc
+        run: cargo build --locked --release -p ukiryu-cli --target "$CLI_TARGET"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docker-cli-${{ matrix.libc }}
+          path: core/target/${{ matrix.target }}/release/ukiryu
+          if-no-files-found: error
+
+  docker:
+    name: Native gem and CLI (${{ matrix.platform }})
+    needs: [build, docker-cli]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {platform: alpine, libc: musl, gem: x86_64-linux-musl}
+          - {platform: ubuntu-22, libc: gnu, gem: x86_64-linux}
+          - {platform: ubuntu-24, libc: gnu, gem: x86_64-linux}
+          - {platform: debian-bookworm, libc: gnu, gem: x86_64-linux}
+          - {platform: debian-trixie, libc: gnu, gem: x86_64-linux}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the gem's qualified core revision
+        id: core
+        shell: bash
+        run: |
+          rev=$(sed -n 's/.*ukiryu-rs?rev=[0-9a-f]*#\([0-9a-f]\{40\}\).*/\1/p' Cargo.lock | head -1)
+          test -n "$rev"
+          echo "ref=$rev" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: ukiryu/ukiryu-rs
+          ref: ${{ steps.core.outputs.ref }}
+          path: core
+      - uses: actions/checkout@v4
+        with:
+          repository: ukiryu/register
+          ref: 63c0997355e59afcecef6c45a2c949f0dd199c93
+          path: register
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-gem-${{ matrix.gem }}
+          path: pkg
+      - uses: actions/download-artifact@v4
+        with:
+          name: docker-cli-${{ matrix.libc }}
+          path: bin
+      - name: Run installed native gem and Rust CLI in the distro
+        shell: bash
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          LOGDIR: ${{ runner.temp }}/docker-test-logs
+        run: |
+          chmod +x bin/ukiryu
+          bash scripts/docker-test-all.sh --binary-gnu "$PWD/bin/ukiryu" --binary-musl "$PWD/bin/ukiryu" \
+            --gems-gnu "$PWD/pkg" --gems-musl "$PWD/pkg" --register "$PWD/register" --core "$PWD/core" "$PLATFORM"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: docker-native-logs-${{ matrix.platform }}
+          path: ${{ runner.temp }}/docker-test-logs
+          if-no-files-found: warn
