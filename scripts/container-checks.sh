@@ -25,7 +25,7 @@ ruby -rjson -rukiryu -e '
 '
 cp -R /ruby-consumer/spec/native /tmp/consumer/native
 cp /ruby-consumer/spec/ffi/{ffi_helper.rb,corpus_spec.rb} /tmp/consumer/
-export UKIRYU_CONFORMANCE_DIR=/core/corpus/conformance
+export UKIRYU_CONFORMANCE_DIR=/core/corpus/conformance UKIRYU_CHECKOUT_ROOT=/ruby-consumer
 "$GEM_HOME/bin/rspec" --options /dev/null --format documentation native corpus_spec.rb
 ukiryu --help > /tmp/cli-help
 grep -q exec /tmp/cli-help

@@ -107,6 +107,8 @@ jobs:
       - name: Native specs against the installed gem
         if: ${{ !matrix.container }}
         shell: bash
+        env:
+          UKIRYU_CHECKOUT_ROOT: ${{ github.workspace }}
         run: |
           export GEM_HOME="$RUNNER_TEMP/gemhome" GEM_PATH="$RUNNER_TEMP/gemhome"
           mkdir -p "$RUNNER_TEMP/run/specs"
@@ -118,14 +120,15 @@ jobs:
       - name: Install and run native specs (musl container)
         if: ${{ matrix.container }}
         run: |
-          docker run --rm -v "$PWD/pkg:/pkg:ro" -v "$PWD/spec/native:/native:ro" ${{ matrix.container }} sh -ec '
+          docker run --rm -v "$PWD/pkg:/pkg:ro" -v "$PWD:/ruby-consumer:ro" \
+            -e UKIRYU_CHECKOUT_ROOT=/ruby-consumer ${{ matrix.container }} sh -ec '
             apk add --no-cache build-base libffi-dev
             export GEM_HOME=/tmp/gemhome GEM_PATH=/tmp/gemhome
             gem install --no-document rspec
             gem install --no-document --verbose /pkg/*.gem
             gem list ukiryu
             mkdir -p /tmp/run/specs
-            cp -R /native /tmp/run/specs/native
+            cp -R /ruby-consumer/spec/native /tmp/run/specs/native
             cd /tmp/run/specs
             ruby -rrspec/core -e "exit RSpec::Core::Runner.run(ARGV)" -- --format documentation native
           '
