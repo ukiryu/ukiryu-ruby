@@ -70,7 +70,7 @@ jobs:
             macOS) syms=$(nm -gU "$lib") ;;
             Windows) syms=$(dumpbin.exe //EXPORTS "$lib" 2>/dev/null || objdump -p "$lib") ;;
           esac
-          for sym in ukiryu_abi_version ukiryu_json ukiryu_free; do
+          for sym in ukiryu_abi_version ukiryu_json ukiryu_free ukiryu_cli_json; do
             grep -Eq "(^|[ _])${sym}\$" <<<"$syms" || { echo "::error::missing export $sym"; echo "$syms" | head -50; exit 1; }
             echo "exported: $sym"
           done

@@ -4,7 +4,7 @@ require "ffi"
 
 module Ukiryu
   module Ffi
-    # One loaded cdylib and its three C exports.
+    # One loaded cdylib and its four C exports.
     #
     # Ownership: the request span is borrowed by the core for the call only;
     # the reply is owned by the caller and released exactly once with
@@ -58,14 +58,18 @@ module Ukiryu
       attr_reader :functions
 
       # Sends the request bytes and returns the reply as a UTF-8 String.
-      def call(request)
+      def call(request, cli: false)
         bytes = request.b
         input = nil
         unless bytes.empty?
           input = ::FFI::MemoryPointer.new(:uint8, bytes.bytesize)
           input.put_bytes(0, bytes)
         end
-        reply = @functions.ukiryu_json(input, bytes.bytesize)
+        reply = if cli
+                  @functions.ukiryu_cli_json(input, bytes.bytesize)
+                else
+                  @functions.ukiryu_json(input, bytes.bytesize)
+                end
         raise Error, "ukiryu_json returned no reply" if reply.nil? || reply.null?
 
         begin
@@ -90,6 +94,7 @@ module Ukiryu
           # Execution can run for the whole timeout; release the GVL.
           attach_function :ukiryu_json, %i[pointer size_t], :pointer, blocking: true
           attach_function :ukiryu_free, [:pointer], :void
+          attach_function :ukiryu_cli_json, %i[pointer size_t], :pointer, blocking: true
         end
       end
     end

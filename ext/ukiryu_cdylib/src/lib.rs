@@ -1,6 +1,6 @@
 //! Cdylib twin of ukiryu-rs's `ukiryu-ffi` crate, built inside the gem so the
 //! platform gem build can compile it per target. It carries no logic: linking
-//! the core with its `c` feature publishes the `#[no_mangle]` exports.
+//! the core with its `c` feature and CLI capture publishes the `#[no_mangle]` exports.
 //!
 //! The exports and their signatures are pinned below so the library cannot
 //! link without them, and so a changed core signature fails to compile here
@@ -9,6 +9,7 @@
 use std::ffi::c_char;
 
 pub use ukiryu::ffi::{ukiryu_abi_version, ukiryu_free, ukiryu_json};
+pub use ukiryu_cli::capture::ukiryu_cli_json;
 
 /// The ABI version the Ruby loader binds (`Ukiryu::Ffi::ABI_VERSION`).
 pub const ABI_VERSION: u32 = 1;
@@ -18,7 +19,12 @@ type Json = unsafe extern "C" fn(*const u8, usize) -> *mut c_char;
 type Free = unsafe extern "C" fn(*mut c_char);
 
 #[used]
-static EXPORTS: (AbiVersion, Json, Free) = (ukiryu_abi_version, ukiryu_json, ukiryu_free);
+static EXPORTS: (AbiVersion, Json, Free, Json) = (
+    ukiryu_abi_version,
+    ukiryu_json,
+    ukiryu_free,
+    ukiryu_cli_json,
+);
 
 #[cfg(test)]
 mod tests {
