@@ -16,11 +16,13 @@ doc = false
 [dependencies]
 # DEVELOPMENT PIN, NOT THE SHIPPED FORM. No ukiryu crate is published yet, so
 # this follows ukiryu/ukiryu-rs at the same commit as ext/ukiryu_native
-# (ukiryu/ukiryu-rs CLI capture), so both tiers of a gem run one core.
+# (CLI capture, core-backed Ruby caches and shell factory),
+# so both tiers of a gem run one core.
 # A gem built from this manifest
 # does not qualify for release: before release this must become the crates.io
 # dependency, for example
 #   ukiryu = { version = "=0.1.0", features = ["c"] }
 # with a comment naming the ukiryu-rs release that carries each fix.
-ukiryu = { git = "https://github.com/ukiryu/ukiryu-rs", rev = "edc45d68e5aebc2497a31164b0188af8cd56574b", features = ["c"] }
-ukiryu-cli = { git = "https://github.com/ukiryu/ukiryu-rs", rev = "edc45d68e5aebc2497a31164b0188af8cd56574b" }
+# Core-backed Ruby caches and shell factory: ukiryu/ukiryu-rs#116.
+ukiryu = { git = "https://github.com/ukiryu/ukiryu-rs", rev = "a6ca3ab16605fad10b28e7333f6ee64d8a635c7f", features = ["c"] }
+ukiryu-cli = { git = "https://github.com/ukiryu/ukiryu-rs", rev = "a6ca3ab16605fad10b28e7333f6ee64d8a635c7f" }

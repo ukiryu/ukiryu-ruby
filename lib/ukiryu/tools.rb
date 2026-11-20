@@ -7,19 +7,51 @@ module Ukiryu
       def const_missing(name)
         tool_name = name.to_s.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
                         .gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase
-        value = Bridge.request("op" => "resolve", "method" => "tool_class",
-                               "register" => Register.default_register_path.to_s,
-                               "tool" => tool_name, "platform" => Host.platform.to_s,
-                               "shell" => Host.shell.to_s)
-        definition = Models::ToolDefinition.new(value.fetch("definition"))
-        index = value.fetch("profile_index")
-        selected = definition.profiles[index] unless index.nil?
-        klass = Class.new(Base)
-        klass.define_singleton_method(:tool_name) { tool_name.to_sym }
-        klass.define_singleton_method(:tool_definition) { definition }
-        klass.define_singleton_method(:platform_profile) { selected }
-        klass.define_singleton_method(:native_tool) { Tool.load_from_string(value.fetch("yaml")) }
-        const_set(name, klass)
+        Generator.generate_and_const_set(tool_name)
+      end
+    end
+
+    module Generator
+      class << self
+        def generated_classes_cache
+          @generated_classes_cache ||= Cache.new(max_size: 50, ttl: 3600)
+        end
+
+        def generate(tool_name)
+          tool_name = tool_name.to_s
+          cached = generated_classes_cache[tool_name.to_sym]
+          return cached if cached
+
+          value = Bridge.request("op" => "resolve", "method" => "tool_class",
+                                 "register" => Register.default_register_path.to_s,
+                                 "tool" => tool_name, "platform" => Host.platform.to_s,
+                                 "shell" => Host.shell.to_s)
+          definition = Models::ToolDefinition.new(value.fetch("definition"))
+          index = value.fetch("profile_index")
+          selected = definition.profiles[index] unless index.nil?
+          klass = Class.new(Base)
+          klass.define_singleton_method(:tool_name) { tool_name.to_sym }
+          klass.define_singleton_method(:tool_definition) { definition }
+          klass.define_singleton_method(:platform_profile) { selected }
+          klass.define_singleton_method(:native_tool) { Tool.load_from_string(value.fetch("yaml")) }
+          generated_classes_cache[tool_name.to_sym] = klass
+          klass
+        end
+
+        def generate_and_const_set(tool_name)
+          klass = generate(tool_name)
+          name = tool_name.to_s.capitalize
+          Tools.const_set(name, klass) unless Tools.const_defined?(name)
+          klass
+        end
+
+        def clear_cache
+          generated_classes_cache.clear
+        end
+
+        def generated?(tool_name)
+          generated_classes_cache.key?(tool_name.to_sym)
+        end
       end
     end
 

@@ -14,7 +14,7 @@ module Ukiryu
       # Raises Ukiryu::Errors::ToolNotFoundError when the register has no
       # such tool.
       def get(name, options = {})
-        key = [name.to_s, options.to_a.sort_by { |k, _| k.to_s }]
+        key = ToolCache.cache_key_for(name, options)
         cached = tools_cache[key]
         return cached if cached
 
@@ -53,11 +53,15 @@ module Ukiryu
 
       # Empties the tool cache and returns it, as the original.
       def clear_cache
-        tools_cache.clear
+        ToolCache.clear
       end
 
       def clear_definition_cache
         Definition::Loader.clear_cache
+      end
+
+      def tools_cache
+        ToolCache.cache
       end
 
       private
@@ -66,10 +70,6 @@ module Ukiryu
         profile = Definition::Loader.load_from_source(definition_source, options)
         source = { "kind" => "definition", "yaml" => profile.to_yaml }
         new(source, options.merge(definition_source: definition_source))
-      end
-
-      def tools_cache
-        @tools_cache ||= {}
       end
     end
 
