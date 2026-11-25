@@ -1,0 +1,5 @@
+implementations:
+- name: default
+  versions:
+  - equals: '1.2'
+    file: '1.2.yaml'

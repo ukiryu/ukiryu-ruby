@@ -116,19 +116,15 @@ module Ukiryu
 
       # -------------------------------------------------------- decoding
 
-      # The core's rule: an object whose first key is a tag is that tagged
-      # value and has no other key; a first key starting with "$" that is not
-      # a tag is an error; anything else is a Hash with String keys.
+      # The core's rule (ukiryu-rs wire/value.rs visit_map): an object is a
+      # tag exactly when it has one key and that key is one of TAGS. Any
+      # other object is a Hash with String keys, even when its keys start
+      # with "$": $schema and $id among others, or a lone $ref (the core
+      # writes a JSON schema's {"$ref" => ...} as that plain object).
       def decode_object(data)
         first = data.keys.first
         return {} if first.nil?
-
-        if TAGS.include?(first)
-          raise EncodingError, "#{first} must be the only key of its object" unless data.size == 1
-
-          return tag(first, data[first])
-        end
-        raise EncodingError, "unknown value tag #{first}" if first.start_with?("$")
+        return tag(first, data[first]) if data.size == 1 && TAGS.include?(first)
 
         data.transform_values { |item| decode(item) }
       end

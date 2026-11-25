@@ -105,11 +105,11 @@ jobs:
         shell: bash
         env:
           UKIRYU_FFI_LIB: ${{ github.workspace }}/tmp/ukiryu-rs/target/release/${{ matrix.ffi_lib }}
+          UKIRYU_CHECKOUT_ROOT: ${{ github.workspace }}
         run: |
           export GEM_HOME="$RUNNER_TEMP/gemhome" GEM_PATH="$RUNNER_TEMP/gemhome"
-          # Run outside the checkout, and outside the directory that holds
-          # GEM_HOME, so lib/ here cannot shadow the installed gem and the
-          # spec's "not from the checkout" check is meaningful.
+          # Run outside the checkout so lib/ here cannot shadow the installed
+          # gem. Pass the real checkout root because these specs are copied.
           mkdir -p "$RUNNER_TEMP/run/specs"
           cp -R spec/native "$RUNNER_TEMP/run/specs/"
           cd "$RUNNER_TEMP/run/specs"

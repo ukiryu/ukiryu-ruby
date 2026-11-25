@@ -1,7 +1,6 @@
 # readme: README.adoc:2249
 # readme: README.adoc:2529
 # readme: README.adoc:2541
-# needs: core definition discovery and version resolution ops (Definition::Discovery, Definition::VersionResolver)
 tool = show(:get_version) { Ukiryu::Tool.get(:inkscape, version: '1.0') }
 show(:version) { tool&.version }
 versions = show(:versions) do
@@ -12,8 +11,5 @@ end
 show(:resolve) { Ukiryu::Definition::VersionResolver.resolve('~> 1.0', versions) }
 tool = show(:get) { Ukiryu::Tool.get(:inkscape) }
 show(:headless_execute) do
-  tool.execute(:export, {
-    inputs: ['drawing.svg'],
-    output: 'drawing.png'
-  })
+  tool.execute(:export, { inputs: ['drawing.svg'], output: 'drawing.png' })
 end

@@ -22,7 +22,11 @@ RSpec.describe Ukiryu::Transport do
   it "loads the extension from the installed gem, not from the checkout" do
     feature = $LOADED_FEATURES.find { |f| f =~ %r{ukiryu/(\d+\.\d+/)?ukiryu_native\.(so|bundle|dll)\z} }
     expect(feature).not_to be_nil
-    expect(feature).not_to start_with(File.expand_path("../..", __dir__))
+    feature = File.expand_path(feature)
+    checkout = File.expand_path(ENV.fetch("UKIRYU_CHECKOUT_ROOT")) + File::SEPARATOR
+    installed = File.expand_path(Gem.loaded_specs.fetch("ukiryu").full_gem_path) + File::SEPARATOR
+    expect(feature).to start_with(installed)
+    expect(feature).not_to start_with(checkout)
   end
 
   it "answers each request with the bytes the ffi tier returns" do
@@ -41,6 +45,22 @@ RSpec.describe Ukiryu::Transport do
   it "raises the gem's error classes through the native tier" do
     expect { Ukiryu::Transport.request("op" => "nope") }.to raise_error(Ukiryu::Ffi::WireError)
     expect(Ukiryu::Errors::TimeoutError.ancestors).to include(Ukiryu::Errors::Error)
+  end
+
+  it "keeps cached Ruby objects and formats shells through the installed native tier" do
+    expect(Ukiryu::Transport.tier).to eq(:native)
+    cache = Ukiryu::Cache.new(max_size: 2, ttl: 3600)
+    object = Object.new
+    cache[:object] = object
+    expect(cache[:object]).to equal(object)
+    expect(cache.stats[:size]).to eq(1)
+    expect(cache.delete(:object)).to equal(object)
+    expect(cache.empty?).to be(true)
+    shell = Ukiryu::Shell::InstanceCache.instance_for(:bash)
+    expect(Ukiryu::Shell::InstanceCache.instance_for(:bash)).to equal(shell)
+    expect(shell.quote("a b")).to eq("'a b'")
+  ensure
+    Ukiryu::Shell::InstanceCache.clear
   end
 
   it "honours UKIRYU_TIER=ffi" do

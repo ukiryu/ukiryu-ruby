@@ -14,7 +14,7 @@ module Ukiryu
       # Raises Ukiryu::Errors::ToolNotFoundError when the register has no
       # such tool.
       def get(name, options = {})
-        key = [name.to_s, options.to_a.sort_by { |k, _| k.to_s }]
+        key = ToolCache.cache_key_for(name, options)
         cached = tools_cache[key]
         return cached if cached
 
@@ -33,8 +33,7 @@ module Ukiryu
       # Builds a tool from a definition file. Raises
       # Ukiryu::Errors::DefinitionNotFoundError when the file is missing.
       #
-      # The original's validation: option (:strict, :lenient, :none) needs a
-      # core load op and is accepted but not applied yet.
+      # Validation modes and inheritance are applied by the native loader.
       def load(file_path, options = {})
         from_source(Definition::Sources::FileSource.new(file_path), options)
       end
@@ -52,27 +51,25 @@ module Ukiryu
         load_from_string(yaml_string, options)
       end
 
+      # Empties the tool cache and returns it, as the original.
       def clear_cache
-        tools_cache.clear
-        nil
+        ToolCache.clear
       end
 
       def clear_definition_cache
         Definition::Loader.clear_cache
       end
 
+      def tools_cache
+        ToolCache.cache
+      end
+
       private
 
       def from_source(definition_source, options)
-        source = { "kind" => "definition", "yaml" => definition_source.load }
+        profile = Definition::Loader.load_from_source(definition_source, options)
+        source = { "kind" => "definition", "yaml" => profile.to_yaml }
         new(source, options.merge(definition_source: definition_source))
-      end
-
-      # The current Ractor's cache; each Ractor resolves its own tools.
-      def tools_cache
-        return @tools_cache ||= {} if RactorLocal.main?
-
-        RactorLocal.fetch(:ukiryu_tools_cache) { {} }
       end
     end
 
@@ -114,6 +111,30 @@ module Ukiryu
       @identity["commands"]
     end
 
+    # The definition selected by the native loader, distinct from the detected
+    # executable version. Nested commands remain native model views.
+    def profile
+      load_profile unless @profile
+      @profile
+    end
+
+    def command_profile
+      load_profile unless @command_profile
+      @command_profile
+    end
+
+    def commands
+      command_profile.commands
+    end
+
+    def command_definition(name)
+      command_profile.command(name)
+    end
+
+    def command?(name)
+      !command_definition(name).nil?
+    end
+
     def definition_path
       @definition_source&.path if @definition_source.respond_to?(:path)
     end
@@ -144,6 +165,17 @@ module Ukiryu
     end
 
     private
+
+    def build_command(name, params)
+      Bridge.request("op" => "build", "tool" => tool_request,
+                     "command" => name.to_s, "params" => Ffi::Value.encode(params))
+    end
+
+    def load_profile
+      value = Bridge.request({ "op" => "resolve", "method" => "tool_profile" }.merge(tool_request))
+      @profile = Models::ToolDefinition.new(value.fetch("definition"))
+      @command_profile = @profile.profiles.fetch(value.fetch("profile_index"))
+    end
 
     def tool_request
       @request

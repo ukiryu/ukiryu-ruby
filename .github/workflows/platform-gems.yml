@@ -54,6 +54,17 @@ jobs:
           - platform: x64-mingw-ucrt
             runner: windows-2022
             library: ukiryu.dll
+          - platform: aarch64-mingw-ucrt
+            runner: windows-11-arm
+            library: ukiryu.dll
+          - platform: x86_64-linux-musl
+            runner: ubuntu-24.04
+            library: libukiryu.so
+            container: ruby:3.4-alpine
+          - platform: aarch64-linux-musl
+            runner: ubuntu-24.04-arm
+            library: libukiryu.so
+            container: ruby:3.4-alpine
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.86
@@ -65,7 +76,23 @@ jobs:
             target
           key: gem-${{ matrix.platform }}-${{ hashFiles('Cargo.lock') }}
       - name: Build cdylib
+        if: ${{ !matrix.container }}
         run: cargo build --release --locked --manifest-path ${{ env.MANIFEST }}
+      # musl: build in the official Alpine Rust image, on the runner's own
+      # architecture. A cdylib on musl needs -crt-static. The image ships
+      # without the C runtime objects (crti.o, Scrt1.o), so install musl-dev
+      # as root first and hand the outputs back to the runner user.
+      - name: Build cdylib (musl)
+        if: ${{ matrix.container }}
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work \
+            -e CARGO_HOME=/work/.cargo-musl \
+            -e RUSTFLAGS="-C target-feature=-crt-static" \
+            -e OWNER="$(id -u):$(id -g)" \
+            rust:1.86-alpine \
+            sh -euc 'apk add --no-cache musl-dev
+              cargo build --release --locked --manifest-path "$1"
+              chown -R "$OWNER" target .cargo-musl' sh ${{ env.MANIFEST }}
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.4'
@@ -89,7 +116,26 @@ jobs:
           ' "$gem" "${{ matrix.platform }}"
           tar -xOf "$gem" data.tar.gz | tar -tz | tee files.txt
           grep -q "lib/ukiryu/ffi/${{ matrix.library }}" files.txt || { echo "::error::library not vendored"; exit 1; }
+      # musl gems cannot be installed on the glibc host Ruby; load them in
+      # an Alpine Ruby container instead.
+      - name: Install into a clean GEM_HOME and load the ffi tier (musl)
+        if: ${{ matrix.container }}
+        run: |
+          docker run --rm -v "$PWD/pkg:/pkg:ro" ${{ matrix.container }} sh -ec '
+            apk add --no-cache build-base libffi-dev
+            export GEM_HOME=/tmp/gemhome GEM_PATH=/tmp/gemhome
+            gem install --no-document /pkg/*.gem
+            cd /tmp
+            ruby -e "
+              require %q(ukiryu/ffi)
+              abort %Q(ffi tier unavailable: #{Ukiryu::Ffi.load_error.inspect}) unless Ukiryu::Ffi.available?
+              lib = Ukiryu::Ffi.library
+              abort %Q(loaded outside the installed gem: #{lib.path}) unless lib.path.include?(%q(gemhome))
+              puts %Q(loaded #{lib.path}, C ABI #{lib.abi_version})
+            "
+          '
       - name: Install into a clean GEM_HOME and load the ffi tier
+        if: ${{ !matrix.container }}
         shell: bash
         run: |
           export GEM_HOME="$RUNNER_TEMP/gemhome" GEM_PATH="$RUNNER_TEMP/gemhome"
