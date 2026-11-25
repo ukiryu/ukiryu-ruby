@@ -122,7 +122,7 @@ jobs:
         run: |
           docker run --rm -v "$PWD/pkg:/pkg:ro" -v "$PWD:/ruby-consumer:ro" \
             -e UKIRYU_CHECKOUT_ROOT=/ruby-consumer ${{ matrix.container }} sh -ec '
-            apk add --no-cache build-base libffi-dev
+            apk add --no-cache build-base libffi-dev bash
             export GEM_HOME=/tmp/gemhome GEM_PATH=/tmp/gemhome
             gem install --no-document rspec
             gem install --no-document --verbose /pkg/*.gem
