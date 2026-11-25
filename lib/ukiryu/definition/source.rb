@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'digest/sha2'
+
 module Ukiryu
   module Definition
     # Abstract base class for definition sources
@@ -79,7 +81,6 @@ module Ukiryu
       # @param string [String] the string to hash
       # @return [String] hexadecimal SHA256 hash
       def sha256(string)
-        require 'digest'
         Digest::SHA256.hexdigest(string)
       end
     end

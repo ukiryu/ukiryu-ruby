@@ -3,8 +3,12 @@
 module Ukiryu
   module ToolCache
     class << self
+      # The main Ractor's cache. Other Ractors cannot read this module's
+      # instance variables, so each builds its own in Ractor-local storage.
       def cache
-        @cache ||= Cache.new(max_size: 50, ttl: 3600)
+        return @cache ||= Cache.new(max_size: 50, ttl: 3600) if RactorLocal.main?
+
+        RactorLocal.fetch(:ukiryu_tools_cache) { Cache.new(max_size: 50, ttl: 3600) }
       end
 
       def get(key)

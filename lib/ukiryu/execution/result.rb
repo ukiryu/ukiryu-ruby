@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'json'
+
 module Ukiryu
   module Execution
     # Result class for command execution
@@ -168,7 +170,6 @@ module Ukiryu
       #
       # @return [String] result data as JSON
       def to_json(*args)
-        require 'json'
         to_h.to_json(*args)
       end
 

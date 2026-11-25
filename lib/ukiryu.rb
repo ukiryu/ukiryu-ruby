@@ -2,6 +2,7 @@
 
 require_relative "ukiryu/version"
 require_relative "ukiryu/errors"
+require_relative "ukiryu/ractor_local"
 require_relative "ukiryu/ffi"
 require_relative "ukiryu/transport"
 require_relative "ukiryu/bridge"
